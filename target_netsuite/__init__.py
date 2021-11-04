@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
-import os
-import json
-import sys
 import argparse
-import requests
-import base64
-import pandas as pd
+import json
 import logging
-import re
+import os
+import sys
+from datetime import datetime
+
+import pandas as pd
+
+from target_netsuite.netsuite import NetSuite
 
 logger = logging.getLogger("target-netsuite")
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
 
 def load_json(path):
     with open(path) as f:
         return json.load(f)
 
 
-def write_json_file(filename, content):
-    with open(filename, 'w') as f:
-        json.dump(content, f, indent=4)
-
-
 def parse_args():
-    '''Parse standard command-line args.
+    """Parse standard command-line args.
     Parses the command-line arguments mentioned in the SPEC and the
     BEST_PRACTICES documents:
     -c,--config     Config file
@@ -34,40 +33,39 @@ def parse_args():
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (config, state, properties), we will automatically
     load and parse the JSON file.
-    '''
+    """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        '-c', '--config',
-        help='Config file',
-        required=True)
+    parser.add_argument("-c", "--config", help="Config file", required=True)
 
     args = parser.parse_args()
     if args.config:
-        setattr(args, 'config_path', args.config)
+        setattr(args, "config_path", args.config)
         args.config = load_json(args.config)
 
     return args
 
 
 def get_ns_client(config):
-    ns_account = config.get('ns_account')
-    ns_consumer_key = config.get('ns_consumer_key')
-    ns_consumer_secret = config.get('ns_consumer_secret')
-    ns_token_key = config.get('ns_token_key')
-    ns_token_secret = config.get('ns_token_secret')
-    is_sandbox = config.get('is_sandbox')
+    ns_account = config.get("ns_account")
+    ns_consumer_key = config.get("ns_consumer_key")
+    ns_consumer_secret = config.get("ns_consumer_secret")
+    ns_token_key = config.get("ns_token_key")
+    ns_token_secret = config.get("ns_token_secret")
+    is_sandbox = config.get("is_sandbox")
 
     logger.info(f"Starting netsuite connection")
-    ns = NetSuite(ns_account=ns_account,
-                  ns_consumer_key=ns_consumer_key,
-                  ns_consumer_secret=ns_consumer_secret,
-                  ns_token_key=ns_token_key,
-                  ns_token_secret=ns_token_secret,
-                  is_sandbox=is_sandbox)
+    ns = NetSuite(
+        ns_account=ns_account,
+        ns_consumer_key=ns_consumer_key,
+        ns_consumer_secret=ns_consumer_secret,
+        ns_token_key=ns_token_key,
+        ns_token_secret=ns_token_secret,
+        is_sandbox=is_sandbox,
+    )
 
     # enable this when using local
-    # ns.connect_tba(caching=True)
+    # s.connect_tba(caching=True)
 
     ns.connect_tba(caching=False)
     logger.info(f"Successfully created netsuite connection..")
@@ -75,15 +73,117 @@ def get_ns_client(config):
 
 
 def get_reference_data(ns_client):
-    customers = ns_client.entities['Customer'].get_all()
-    accounts = ns_client.entities['Accounts'].get_all()
-    classifications = ns_client.entities['Classifications'].get_all()
+    accounts = ns_client.entities["Accounts"].get_all()
+    classifications = ns_client.entities["Classifications"].get_all()
+    currencies = ns_client.currencies.get_all()
+    departments = ns_client.departments.get_all()
+    locations = ns_client.locations.get_all()
 
     return {
-        'Customers': json.loads(json.dumps(customers, default=str, indent=2)),
-        'Accounts': json.loads(json.dumps(accounts, default=str, indent=2)),
-        'Classifications': json.loads(json.dumps(classifications, default=str, indent=2))
+        "Accounts": json.loads(json.dumps(accounts, default=str, indent=2)),
+        "Currencies": json.loads(json.dumps(currencies, default=str, indent=2)),
+        "Classifications": json.loads(json.dumps(classifications, default=str, indent=2)),
+        "Departments": json.loads(json.dumps(departments, default=str, indent=2)),
+        "Locations": json.loads(json.dumps(locations, default=str, indent=2)),
     }
+
+
+def build_lines(x, ref_data):
+
+    line_items = []
+    subsidiaries = {}
+    # Create line items
+    for _, row in x.iterrows():
+        # Get the NetSuite Account Ref
+        acct_num = str(row["Account Number"])
+        acct_data = next(a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num)
+        ref_acct = {
+            "name": acct_data.get("name"),
+            "externalId": acct_data.get("externalId"),
+            "internalId": acct_data.get("internalId"),
+        }
+        journal_entry_line = {"account": ref_acct}
+        
+        # Extract the subsidiaries from Account
+        subsidiary = acct_data['subsidiaryList']['recordRef']
+        if subsidiary:
+            subsidiary = subsidiary[0]
+            if row["Posting Type"] == "Credit":
+                subsidiaries["toSubsidiary"] = subsidiary
+            elif row["Posting Type"] == "Debit":
+                subsidiaries["subsidiary"] = subsidiary
+
+        # Get the NetSuite Class Ref
+        
+        class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"].split(" - ")]
+        if class_data:
+            journal_entry_line["class"] = {
+                "name": class_data[0].get("name"),
+                "externalId": class_data[0].get("externalId"),
+                "internalId": class_data[0].get("internalId"),
+            }
+
+        # Get the NetSuite Department Ref
+        dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"].split(" - ")]
+        if dept_data:
+            journal_entry_line["department"] = {
+                "name": dept_data[0].get("name"),
+                "externalId": dept_data[0].get("externalId"),
+                "internalId": dept_data[0].get("internalId"),
+            }
+
+        # Get the NetSuite Location Ref
+        loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
+        if loc_data:
+            journal_entry_line["location"] = {
+                "name": loc_data[0].get("name"),
+                "externalId": loc_data[0].get("externalId"),
+                "internalId": loc_data[0].get("internalId"),
+            }
+
+        # Check the Posting Type and insert the Amount
+        if row["Posting Type"] == "Credit":
+            journal_entry_line["credit"] = round(row["Amount"], 2)
+        elif row["Posting Type"] == "Debit":
+            journal_entry_line["debit"] = round(row["Amount"], 2)
+
+        # Insert the Journal Entry to the memo field
+        journal_entry_line["memo"] = x["Description"].iloc[0]
+        
+        line_items.append(journal_entry_line)
+
+    # Get the currency ID
+    currency_data = [
+        c for c in ref_data["Currencies"] if c["symbol"] == row["Currency"]
+        ]
+    if currency_data:
+        currency_ref = {
+            "name": currency_data[0].get("symbol"),
+            "externalId": currency_data[0].get("externalId"),
+            "internalId": currency_data[0].get("internalId"),
+        }
+    else:
+        currency_ref = None
+
+    # Check if subsidiary is duplicated and delete toSubsidiary if true
+    if len(subsidiaries)>1:
+        if subsidiaries['subsidiary'] == subsidiaries['toSubsidiary']:
+            del subsidiaries['toSubsidiary']
+
+    date_str = x["Transaction Date"].iloc[0]
+    # Create the journal entry
+    journal_entry = {
+        "createdDate": datetime.strptime(date_str, "%m/%d/%y"),
+        "tranDate": datetime.strptime(date_str, "%m/%d/%y"),
+        "externalId": x["Journal Entry Id"].iloc[0],
+        "lineList": line_items,
+        "currency": currency_ref
+    }
+    
+    # Update the entry with subsidiaries
+    journal_entry.update(subsidiaries)
+
+    return journal_entry
 
 
 def load_journal_entries(config, reference_data):
@@ -93,102 +193,41 @@ def load_journal_entries(config, reference_data):
     df = pd.read_csv(input_path)
     # Verify it has required columns
     cols = list(df.columns)
-    REQUIRED_COLS = ["Transaction Date", "Journal Entry Id", "Customer Name", "Class", "Account Number", "Account Name", "Posting Type", "Description"]
+    REQUIRED_COLS = [
+        "Transaction Date",
+        "Journal Entry Id",
+        "Customer Name",
+        "Class",
+        "Account Number",
+        "Account Name",
+        "Posting Type",
+        "Description",
+    ]
 
     if not all(col in cols for col in REQUIRED_COLS):
-        logger.error(f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}")
+        logger.error(
+            f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
+        )
         sys.exit(1)
 
-    journal_entries = []
-    errored = False
-
-    def build_lines(x):
-        # Get the journal entry id
-        je_id = x['Journal Entry Id'].iloc[0]
-        logger.info(f"Converting {je_id}...")
-        line_items = []
-
-        # Create line items
-        for index, row in x.iterrows():
-            # Create journal entry line detail
-            je_detail = {
-                "PostingType": row['Posting Type']
-            }
-
-            # Get the Quickbooks Account Ref
-            acct_num = str(row['Account Number'])
-            acct_name = row['Account Name']
-            acct_ref = accounts.get(acct_num, accounts.get(acct_name, {})).get("Id")
-
-            if acct_ref is not None:
-                je_detail["AccountRef"] = {
-                    "value": acct_ref
-                }
-            else:
-                errored = True
-                logger.error(f"Account is missing on Journal Entry {je_id}! Name={acct_name} No={acct_num}")
-
-            # Get the Quickbooks Class Ref
-            class_name = row['Class']
-            class_ref = classes.get(class_name, {}).get("Id")
-
-            if class_ref is not None:
-                je_detail["ClassRef"] = {
-                    "value": class_ref
-                }
-            else:
-                logger.warning(f"Class is missing on Journal Entry {je_id}! Name={class_name}")
-
-            # Get the Quickbooks Customer Ref
-            customer_name = row['Customer Name']
-            customer_ref = customers.get(customer_name, {}).get("Id")
-
-            if customer_ref is not None:
-                je_detail["Entity"] = {
-                    "EntityRef": {
-                        "value": customer_ref
-                    },
-                    "Type": "Customer"
-                }
-            else:
-                logger.warning(f"Customer is missing on Journal Entry {je_id}! Name={customer_name}")
-
-            # Create the line item
-            line_items.append({
-                "Description": row['Description'],
-                "Amount": row['Amount'],
-                "DetailType": "JournalEntryLineDetail",
-                "JournalEntryLineDetail": je_detail
-            })
-
-        # Create the entry
-        entry = {
-            'TxnDate': row['Transaction Date'],
-            'DocNumber': je_id,
-            'Line': line_items
-        }
-
-        # Append the currency if provided
-        if row.get('Currency') is not None:
-            entry['CurrencyRef'] = {
-                'value': row['Currency']
-            }
-
-        journal_entries.append(entry)
-
     # Build the entries
-    df.groupby("Journal Entry Id").apply(build_lines)
-
-    if errored:
+    try:
+        lines = df.groupby(["Journal Entry Id"]).apply(build_lines, reference_data)
+    except RuntimeError as e:
         raise Exception("Building QBO JournalEntries failed!")
 
     # Print journal entries
-    logger.info(f"Loaded {len(journal_entries)} journal entries to post")
+    logger.info(f"Loaded {len(lines)} journal entries to post")
 
-    return journal_entries
+    return lines.values
 
 
-# def post_journal_entries(journals, ns_client):
+def post_journal_entries(journals, ns_client):
+    for data_to_post in journals:
+        entity = "JournalEntry"
+        # logger.info(f"Posting data for entity {1}")
+        response = ns_client.entities[entity].post(data_to_post)
+        return json.dumps({entity: response}, default=str, indent=2)
 
 
 def upload_journals(config, ns_client):
@@ -199,13 +238,13 @@ def upload_journals(config, ns_client):
     journals = load_journal_entries(config, reference_data)
 
     # Post the journal entries to Quickbooks
-    # post_journal_entries(journals, security_context)
+    post_journal_entries(journals, ns_client)
 
 
 def upload(config, args):
     # Login to NetSuite
     ns = get_ns_client(config)
-    ns_client = ns.client
+    ns_client = ns.ns_client
 
     if os.path.exists(f"{config['input_path']}/JournalEntries.csv"):
         logger.info("Found JournalEntries.csv, uploading...")

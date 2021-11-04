@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='target-netsuite',
-    version='1.0.0',
+    version='1.1.0',
     description='hotglue target for exporting data to NetSuite',
     author='hotglue',
     url='https://hotglue.xyz',
@@ -13,7 +13,8 @@ setup(
     install_requires=[
         'requests==2.20.0',
         'pandas==1.1.3',
-        'argparse==1.4.0'
+        'argparse==1.4.0',
+        'netsuitesdk==2.7.0'
     ],
     entry_points='''
         [console_scripts]

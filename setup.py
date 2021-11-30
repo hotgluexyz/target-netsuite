@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 setup(
     name='target-netsuite',
-    version='1.1.0',
+    version='1.0.0',
     description='hotglue target for exporting data to NetSuite',
     author='hotglue',
     url='https://hotglue.xyz',
@@ -20,5 +20,9 @@ setup(
         [console_scripts]
         target-netsuite=target_netsuite:main
     ''',
-    packages=['target_netsuite']
+    packages=find_packages(exclude=['tests']),
+    package_data={
+        'target_netsuite.netsuite': ['schemas/*.json']
+    },
+    include_package_data=True,
 )

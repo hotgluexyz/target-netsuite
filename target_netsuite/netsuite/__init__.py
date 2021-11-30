@@ -5,7 +5,7 @@ import singer
 from typing import Dict
 import singer.utils as singer_utils
 from singer import metadata, metrics
-from tap_netsuite.netsuite.soap import Soap
+from target_netsuite.netsuite.soap import Soap
 
 LOGGER = singer.get_logger()
 

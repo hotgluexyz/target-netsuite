@@ -73,7 +73,6 @@ def get_ns_client(config):
     logger.info(f"Successfully created netsuite connection..")
     return ns
 
-# TODO: try and catch the error
 def get_reference_data(ns_client):
     logger.info(f"Readding data from API...")
 

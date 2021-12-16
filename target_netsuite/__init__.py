@@ -10,6 +10,8 @@ import pandas as pd
 
 from target_netsuite.netsuite import NetSuite
 
+from netsuitesdk.internal.exceptions import NetSuiteRequestError
+
 logger = logging.getLogger("target-netsuite")
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -71,22 +73,33 @@ def get_ns_client(config):
     logger.info(f"Successfully created netsuite connection..")
     return ns
 
-
+# TODO: try and catch the error
 def get_reference_data(ns_client):
     logger.info(f"Readding data from API...")
-    # locations = ns_client.locations.get_all()
-    accounts = ns_client.entities["Accounts"].get_all()
-    classifications = ns_client.entities["Classifications"].get_all()
-    currencies = ns_client.currencies.get_all()
-    departments = ns_client.departments.get_all()
 
-    return {
-        "Accounts": accounts,
-        "Currencies": currencies,
-        "Classifications": classifications,
-        "Departments": departments,
-        # "Locations": locations,
-    }
+    reference_data = {}
+    try:
+        reference_data["Locations"] = ns_client.locations.get_all()
+    except NetSuiteRequestError as e:
+        logger.warning(f"Error on getting Locations data: {e.message}")
+    try:
+        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
+    except NetSuiteRequestError as e:
+        logger.warning(f"Error on getting Accounts data: {e.message}")
+    try:
+        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
+    except NetSuiteRequestError as e:
+        logger.warning(f"Error on getting Classifications data: {e.message}")
+    try:
+        reference_data["Currencies"] = ns_client.currencies.get_all()
+    except NetSuiteRequestError as e:
+        logger.warning(f"Error on getting Currencies data: {e.message}")
+    try:
+        reference_data["Departments"] = ns_client.departments.get_all()
+    except NetSuiteRequestError as e:
+        logger.warning(f"Error on getting Departments data: {e.message}")
+
+    return reference_data
 
 
 def build_lines(x, ref_data):
@@ -96,58 +109,61 @@ def build_lines(x, ref_data):
     # Create line items
     for _, row in x.iterrows():
         # Get the NetSuite Account Ref
-        acct_num = str(row["Account Number"])
-        acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
-        if not acct_data:
-            logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
-            continue
-        acct_data = acct_data[0].__dict__['__values__']
-        ref_acct = {
-            "name": acct_data.get("acctName"),
-            "externalId": acct_data.get("externalId"),
-            "internalId": acct_data.get("internalId"),
-        }
-        journal_entry_line = {"account": ref_acct}
-        
-        # Extract the subsidiaries from Account
-        subsidiary = acct_data['subsidiaryList']['recordRef']
-        if subsidiary:
-            subsidiary = subsidiary[0].__dict__['__values__']
-            if row["Posting Type"] == "Credit":
-                subsidiaries["toSubsidiary"] = subsidiary
-            elif row["Posting Type"] == "Debit":
-                subsidiaries["subsidiary"] = subsidiary
+        if ref_data.get("Accounts") and row.get("Account Number"):
+            acct_num = str(row["Account Number"])
+            acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
+            if not acct_data:
+                logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
+                continue
+            acct_data = acct_data[0].__dict__['__values__']
+            ref_acct = {
+                "name": acct_data.get("acctName"),
+                "externalId": acct_data.get("externalId"),
+                "internalId": acct_data.get("internalId"),
+            }
+            journal_entry_line = {"account": ref_acct}
+
+            # Extract the subsidiaries from Account
+            subsidiary = acct_data['subsidiaryList']['recordRef']
+            if subsidiary:
+                subsidiary = subsidiary[0].__dict__['__values__']
+                if row.get("Posting Type") == "Credit":
+                    subsidiaries["toSubsidiary"] = subsidiary
+                elif row.get("Posting Type") == "Debit":
+                    subsidiaries["subsidiary"] = subsidiary
 
         # Get the NetSuite Class Ref
-        
-        class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"].split(" - ")]
-        if class_data:
-            class_data = class_data[0].__dict__['__values__']
-            journal_entry_line["class"] = {
-                "name": class_data.get("name"),
-                "externalId": class_data.get("externalId"),
-                "internalId": class_data.get("internalId"),
-            }
+        if ref_data.get("Classifications") and row.get("Class"):
+            class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"].split(" - ")]
+            if class_data:
+                class_data = class_data[0].__dict__['__values__']
+                journal_entry_line["class"] = {
+                    "name": class_data.get("name"),
+                    "externalId": class_data.get("externalId"),
+                    "internalId": class_data.get("internalId"),
+                }
 
         # Get the NetSuite Department Ref
-        dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"].split(" - ")]
-        if dept_data:
-            dept_data = dept_data[0].__dict__['__values__']
-            journal_entry_line["department"] = {
-                "name": dept_data.get("name"),
-                "externalId": dept_data.get("externalId"),
-                "internalId": dept_data.get("internalId"),
-            }
+        if ref_data.get("Departments") and row.get("Department"):
+            dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"].split(" - ")]
+            if dept_data:
+                dept_data = dept_data[0].__dict__['__values__']
+                journal_entry_line["department"] = {
+                    "name": dept_data.get("name"),
+                    "externalId": dept_data.get("externalId"),
+                    "internalId": dept_data.get("internalId"),
+                }
 
         # Get the NetSuite Location Ref
-        # loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
-        # if loc_data:
-        #     loc_data = loc_data[0].__dict__['__values__']
-        #     journal_entry_line["location"] = {
-        #         "name": loc_data.get("name"),
-        #         "externalId": loc_data.get("externalId"),
-        #         "internalId": loc_data.get("internalId"),
-        #     }
+        if ref_data.get("Locations") and row.get("Location"):
+            loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
+            if loc_data:
+                loc_data = loc_data[0].__dict__['__values__']
+                journal_entry_line["location"] = {
+                    "name": loc_data.get("name"),
+                    "externalId": loc_data.get("externalId"),
+                    "internalId": loc_data.get("internalId"),
+                }
 
         # Check the Posting Type and insert the Amount
         if row["Posting Type"] == "Credit":
@@ -156,21 +172,23 @@ def build_lines(x, ref_data):
             journal_entry_line["debit"] = round(row["Amount"], 2)
 
         # Insert the Journal Entry to the memo field
-        journal_entry_line["memo"] = x["Description"].iloc[0]
+        if "Description" in x.columns:
+            journal_entry_line["memo"] = x["Description"].iloc[0]
         
         line_items.append(journal_entry_line)
 
     # Get the currency ID
-    currency_data = [
-        c for c in ref_data["Currencies"] if c["symbol"] == row["Currency"]
-        ]
-    if currency_data:
-        currency_data = currency_data[0]
-        currency_ref = {
-            "name": currency_data.get("symbol"),
-            "externalId": currency_data.get("externalId"),
-            "internalId": currency_data.get("internalId"),
-        }
+    if ref_data.get("Currencies") and row.get("Currency"):
+        currency_data = [
+            c for c in ref_data["Currencies"] if c["symbol"] == row["Currency"]
+            ]
+        if currency_data:
+            currency_data = currency_data[0]
+            currency_ref = {
+                "name": currency_data.get("symbol"),
+                "externalId": currency_data.get("externalId"),
+                "internalId": currency_data.get("internalId"),
+            }
     else:
         currency_ref = None
 
@@ -179,11 +197,15 @@ def build_lines(x, ref_data):
         if subsidiaries['subsidiary'] == subsidiaries['toSubsidiary']:
             del subsidiaries['toSubsidiary']
 
-    date_str = x["Transaction Date"].iloc[0]
+    if "Transaction Date" in x.columns:
+        created_date = datetime.strptime(x["Transaction Date"].iloc[0], "%m/%d/%y")
+    else:
+        created_date = None
+
     # Create the journal entry
     journal_entry = {
-        "createdDate": datetime.strptime(date_str, "%m/%d/%y"),
-        "tranDate": datetime.strptime(date_str, "%m/%d/%y"),
+        "createdDate": created_date,
+        "tranDate": created_date,
         "externalId": x["Journal Entry Id"].iloc[0],
         "lineList": line_items,
         "currency": currency_ref

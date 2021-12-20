@@ -123,9 +123,12 @@ def build_lines(x, ref_data):
             journal_entry_line = {"account": ref_acct}
 
             # Extract the subsidiaries from Account
-            subsidiary = acct_data['subsidiaryList']['recordRef']
+            if row.get("Subsidiary"):
+                subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
+            else:
+                subsidiary = acct_data['subsidiaryList']['recordRef']
+                subsidiary = subsidiary[0].__dict__['__values__'] if subsidiary else None
             if subsidiary:
-                subsidiary = subsidiary[0].__dict__['__values__']
                 if row.get("Posting Type") == "Credit":
                     subsidiaries["toSubsidiary"] = subsidiary
                 elif row.get("Posting Type") == "Debit":
@@ -197,7 +200,7 @@ def build_lines(x, ref_data):
             del subsidiaries['toSubsidiary']
 
     if "Transaction Date" in x.columns:
-        created_date = datetime.strptime(x["Transaction Date"].iloc[0], "%m/%d/%y")
+        created_date = pd.to_datetime(x["Transaction Date"].iloc[0])
     else:
         created_date = None
 

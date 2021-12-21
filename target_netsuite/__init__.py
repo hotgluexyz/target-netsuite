@@ -80,23 +80,28 @@ def get_reference_data(ns_client):
     try:
         reference_data["Locations"] = ns_client.locations.get_all()
     except NetSuiteRequestError as e:
-        logger.warning(f"Error on getting Locations data: {e.message}")
+        message = e.message.replace("error", "failure").replace("Error", "")
+        logger.warning(f"It was not possible to retrieve Locations data: {message}")
     try:
         reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
     except NetSuiteRequestError as e:
-        logger.warning(f"Error on getting Accounts data: {e.message}")
+        message = e.message.replace("error", "failure").replace("Error", "")
+        logger.warning(f"It was not possible to retrieve Accounts data: {message}")
     try:
         reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
     except NetSuiteRequestError as e:
-        logger.warning(f"Error on getting Classifications data: {e.message}")
+        message = e.message.replace("error", "failure").replace("Error", "")
+        logger.warning(f"It was not possible to retrieve Classifications data: {message}")
     try:
         reference_data["Currencies"] = ns_client.currencies.get_all()
     except NetSuiteRequestError as e:
-        logger.warning(f"Error on getting Currencies data: {e.message}")
+        message = e.message.replace("error", "failure").replace("Error", "")
+        logger.warning(f"It was not possible to retrieve Currencies data: {message}")
     try:
         reference_data["Departments"] = ns_client.departments.get_all()
     except NetSuiteRequestError as e:
-        logger.warning(f"Error on getting Departments data: {e.message}")
+        message = e.message.replace("error", "failure").replace("Error", "")
+        logger.warning(f"It was not possible to retrieve Departments data: {message}")
 
     return reference_data
 

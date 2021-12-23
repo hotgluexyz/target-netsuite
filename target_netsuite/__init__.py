@@ -134,10 +134,12 @@ def build_lines(x, ref_data):
                 subsidiary = acct_data['subsidiaryList']['recordRef']
                 subsidiary = subsidiary[0].__dict__['__values__'] if subsidiary else None
             if subsidiary:
-                if row.get("Posting Type") == "Credit":
+                if row["Posting Type"].lower() == "credit":
                     subsidiaries["toSubsidiary"] = subsidiary
-                elif row.get("Posting Type") == "Debit":
+                elif row["Posting Type"].lower() == "debit":
                     subsidiaries["subsidiary"] = subsidiary
+                else:
+                    raise('Posting Type must be "credit" or "debit"')
 
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class"):
@@ -173,10 +175,11 @@ def build_lines(x, ref_data):
                 }
 
         # Check the Posting Type and insert the Amount
-        if row["Posting Type"] == "Credit":
-            journal_entry_line["credit"] = round(row["Amount"], 2)
-        elif row["Posting Type"] == "Debit":
-            journal_entry_line["debit"] = round(row["Amount"], 2)
+        amount = 0 if pd.isna(row["Amount"]) else abs(round(row["Amount"], 2))
+        if row["Posting Type"].lower() == "credit":
+            journal_entry_line["credit"] = amount
+        elif row["Posting Type"].lower() == "debit":
+            journal_entry_line["debit"] = amount
 
         # Insert the Journal Entry to the memo field
         if "Description" in x.columns:

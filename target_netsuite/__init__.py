@@ -82,26 +82,17 @@ def get_reference_data(ns_client):
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
+    
     try:
-        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
+        reference_data["Customer"] = ns_client.entities["Customer"].get_all()
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
-        logger.warning(f"It was not possible to retrieve Accounts data: {message}")
-    try:
-        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
-    except NetSuiteRequestError as e:
-        message = e.message.replace("error", "failure").replace("Error", "")
-        logger.warning(f"It was not possible to retrieve Classifications data: {message}")
-    try:
-        reference_data["Currencies"] = ns_client.currencies.get_all()
-    except NetSuiteRequestError as e:
-        message = e.message.replace("error", "failure").replace("Error", "")
-        logger.warning(f"It was not possible to retrieve Currencies data: {message}")
-    try:
-        reference_data["Departments"] = ns_client.departments.get_all()
-    except NetSuiteRequestError as e:
-        message = e.message.replace("error", "failure").replace("Error", "")
-        logger.warning(f"It was not possible to retrieve Departments data: {message}")
+        logger.warning(f"It was not possible to retrieve Customer data: {message}")
+    
+    reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
+    reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
+    reference_data["Currencies"] = ns_client.currencies.get_all()
+    reference_data["Departments"] = ns_client.departments.get_all()
 
     return reference_data
 
@@ -113,7 +104,7 @@ def build_lines(x, ref_data):
     # Create line items
     for _, row in x.iterrows():
         # Get the NetSuite Account Ref
-        if ref_data.get("Accounts") and row.get("Account Number"):
+        if ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
             acct_num = str(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
@@ -142,8 +133,8 @@ def build_lines(x, ref_data):
                     raise('Posting Type must be "credit" or "debit"')
 
         # Get the NetSuite Class Ref
-        if ref_data.get("Classifications") and row.get("Class"):
-            class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"].split(" - ")]
+        if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
+            class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"]]
             if class_data:
                 class_data = class_data[0].__dict__['__values__']
                 journal_entry_line["class"] = {
@@ -153,8 +144,8 @@ def build_lines(x, ref_data):
                 }
 
         # Get the NetSuite Department Ref
-        if ref_data.get("Departments") and row.get("Department"):
-            dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"].split(" - ")]
+        if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
+            dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"]]
             if dept_data:
                 dept_data = dept_data[0].__dict__['__values__']
                 journal_entry_line["department"] = {
@@ -164,7 +155,7 @@ def build_lines(x, ref_data):
                 }
 
         # Get the NetSuite Location Ref
-        if ref_data.get("Locations") and row.get("Location"):
+        if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):
             loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
             if loc_data:
                 loc_data = loc_data[0].__dict__['__values__']
@@ -172,6 +163,16 @@ def build_lines(x, ref_data):
                     "name": loc_data.get("name"),
                     "externalId": loc_data.get("externalId"),
                     "internalId": loc_data.get("internalId"),
+                }
+
+        # Get the NetSuite Location Ref
+        if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
+            customer_data = [c for c in ref_data["Customer"] if row["Customer Name"] in c["entityId"]]
+            if customer_data:
+                customer_data = customer_data[0].__dict__['__values__']
+                journal_entry_line["entity"] = {
+                    "externalId": customer_data.get("externalId"),
+                    "internalId": customer_data.get("internalId"),
                 }
 
         # Check the Posting Type and insert the Amount

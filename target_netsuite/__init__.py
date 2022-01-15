@@ -73,26 +73,35 @@ def get_ns_client(config):
     logger.info(f"Successfully created netsuite connection..")
     return ns
 
-def get_reference_data(ns_client):
+def get_reference_data(ns_client, input_data):
     logger.info(f"Readding data from API...")
-
     reference_data = {}
+
     try:
-        reference_data["Locations"] = ns_client.locations.get_all()
+        if not input_data["Location"].dropna().empty:
+            reference_data["Locations"] = ns_client.locations.get_all()
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
-        reference_data["Customer"] = ns_client.entities["Customer"].get_all()
+        if not input_data["Customer Name"].dropna().empty:
+            reference_data["Customer"] = ns_client.entities["Customer"].get_all()
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
     
-    reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
-    reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
-    reference_data["Currencies"] = ns_client.currencies.get_all()
-    reference_data["Departments"] = ns_client.departments.get_all()
+    if not input_data["Account Number"].dropna().empty:
+        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
+    
+    if not input_data["Class"].dropna().empty:
+        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
+    
+    if not input_data["Currency"].dropna().empty:
+        reference_data["Currencies"] = ns_client.currencies.get_all()
+    
+    if not input_data["Department"].dropna().empty:
+        reference_data["Departments"] = ns_client.departments.get_all()
 
     return reference_data
 
@@ -228,33 +237,11 @@ def build_lines(x, ref_data):
     return journal_entry
 
 
-def load_journal_entries(config, reference_data):
-    # Get input path
-    input_path = f"{config['input_path']}/JournalEntries.csv"
-    # Read the passed CSV
-    df = pd.read_csv(input_path)
-    # Verify it has required columns
-    cols = list(df.columns)
-    REQUIRED_COLS = [
-        "Transaction Date",
-        "Journal Entry Id",
-        "Customer Name",
-        "Class",
-        "Account Number",
-        "Account Name",
-        "Posting Type",
-        "Description",
-    ]
-
-    if not all(col in cols for col in REQUIRED_COLS):
-        logger.error(
-            f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
-        )
-        sys.exit(1)
+def load_journal_entries(input_data, reference_data):
 
     # Build the entries
     try:
-        lines = df.groupby(["Journal Entry Id"]).apply(build_lines, reference_data)
+        lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data)
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 
@@ -271,12 +258,41 @@ def post_journal_entries(journal, ns_client):
         return json.dumps({entity: response}, default=str, indent=2)
 
 
+def read_input_data(config):
+    # Get input path
+    input_path = f"{config['input_path']}/JournalEntries.csv"
+    # Read the passed CSV
+    input_data = pd.read_csv(input_path)
+    cols = list(input_data.columns)
+    REQUIRED_COLS = [
+        "Transaction Date",
+        "Journal Entry Id",
+        "Customer Name",
+        "Class",
+        "Account Number",
+        "Account Name",
+        "Posting Type",
+        "Description",
+    ]
+    # Verify it has required columns
+    if not all(col in cols for col in REQUIRED_COLS):
+        logger.error(
+            f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
+        )
+        sys.exit(1)
+    
+    return input_data
+
+
 def upload_journals(config, ns_client):
+    # Read input data
+    input_data = read_input_data(config)
+    
     # Load reference data
-    reference_data = get_reference_data(ns_client)
+    reference_data = get_reference_data(ns_client, input_data)
 
     # Load Journal Entries CSV to post + Convert to NetSuite format
-    journals = load_journal_entries(config, reference_data)
+    journals = load_journal_entries(input_data, reference_data)
 
     # Post the journal entries to Netsuite
     for journal in journals:

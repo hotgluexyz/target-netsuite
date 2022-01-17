@@ -28,10 +28,6 @@ def parse_args():
     Parses the command-line arguments mentioned in the SPEC and the
     BEST_PRACTICES documents:
     -c,--config     Config file
-    -s,--state      State file
-    -d,--discover   Run in discover mode
-    -p,--properties Properties file: DEPRECATED, please use --catalog instead
-    --catalog       Catalog file
     Returns the parsed args object from argparse. For each argument that
     point to JSON files (config, state, properties), we will automatically
     load and parse the JSON file.
@@ -193,7 +189,7 @@ def build_lines(x, ref_data):
 
         # Insert the Journal Entry to the memo field
         if "Description" in x.columns:
-            journal_entry_line["memo"] = x["Description"].iloc[0]
+            journal_entry_line["memo"] = row["Description"]
         
         line_items.append(journal_entry_line)
 

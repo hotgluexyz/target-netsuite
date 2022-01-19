@@ -226,6 +226,9 @@ def build_lines(x, ref_data):
         "lineList": line_items,
         "currency": currency_ref
     }
+
+    if "JournalDesc" in x.columns:
+        journal_entry["memo"] = "" if pd.isnull(x["JournalDesc"].iloc[0]) else x["JournalDesc"].iloc[0]
     
     # Update the entry with subsidiaries
     journal_entry.update(subsidiaries)
@@ -234,7 +237,6 @@ def build_lines(x, ref_data):
 
 
 def load_journal_entries(input_data, reference_data):
-
     # Build the entries
     try:
         lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data)

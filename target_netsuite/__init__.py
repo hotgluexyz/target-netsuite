@@ -74,8 +74,9 @@ def get_reference_data(ns_client, input_data):
     reference_data = {}
 
     try:
-        if not input_data["Location"].dropna().empty:
-            reference_data["Locations"] = ns_client.locations.get_all()
+        if input_data.get("Location"):
+            if not input_data["Location"].dropna().empty:
+                reference_data["Locations"] = ns_client.locations.get_all()
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
@@ -96,8 +97,9 @@ def get_reference_data(ns_client, input_data):
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.currencies.get_all()
     
-    if not input_data["Department"].dropna().empty:
-        reference_data["Departments"] = ns_client.departments.get_all()
+    if input_data.get("Department"):
+        if not input_data["Department"].dropna().empty:
+            reference_data["Departments"] = ns_client.departments.get_all()
 
     return reference_data
 

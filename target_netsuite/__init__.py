@@ -74,7 +74,7 @@ def get_reference_data(ns_client, input_data):
     reference_data = {}
 
     try:
-        if input_data.get("Location"):
+        if "Location" in input_data.columns:
             if not input_data["Location"].dropna().empty:
                 reference_data["Locations"] = ns_client.locations.get_all()
     except NetSuiteRequestError as e:
@@ -97,7 +97,7 @@ def get_reference_data(ns_client, input_data):
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.currencies.get_all()
     
-    if input_data.get("Department"):
+    if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
             reference_data["Departments"] = ns_client.departments.get_all()
 

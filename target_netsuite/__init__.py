@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime
+from difflib import get_close_matches
 
 import pandas as pd
 
@@ -141,7 +141,9 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
-            class_data = [d for d in ref_data["Classifications"] if row["Class"] in d["name"]]
+            class_names = [c["name"] for c in ref_data["Classifications"]]
+            class_name = get_close_matches(row["Class"], class_names, 1, 0.5)[0]
+            class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name]
             if class_data:
                 class_data = class_data[0].__dict__['__values__']
                 journal_entry_line["class"] = {
@@ -152,7 +154,9 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Department Ref
         if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
-            dept_data = [d for d in ref_data["Departments"] if row["Department"] in d["name"]]
+            dept_names = [d["name"] for d in ref_data["Departments"]]
+            dept_name = get_close_matches(row["Department"], dept_names, 1, 0.5)[0]
+            dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name]
             if dept_data:
                 dept_data = dept_data[0].__dict__['__values__']
                 journal_entry_line["department"] = {
@@ -174,7 +178,9 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Location Ref
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
-            customer_data = [c for c in ref_data["Customer"] if row["Customer Name"] in c["entityId"]]
+            customer_names = [c["name"] for c in ref_data["Customer"]]
+            customer_name = get_close_matches(row["Customer Name"], customer_names, 1, 0.5)[0]
+            customer_data = [c for c in ref_data["Customer"] if c["name"] == customer_name]
             if customer_data:
                 customer_data = customer_data[0].__dict__['__values__']
                 journal_entry_line["entity"] = {

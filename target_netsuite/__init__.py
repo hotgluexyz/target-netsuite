@@ -142,28 +142,30 @@ def build_lines(x, ref_data):
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
             class_names = [c["name"] for c in ref_data["Classifications"]]
-            class_name = get_close_matches(row["Class"], class_names, 1, 0.5)[0]
-            class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name]
-            if class_data:
-                class_data = class_data[0].__dict__['__values__']
-                journal_entry_line["class"] = {
-                    "name": class_data.get("name"),
-                    "externalId": class_data.get("externalId"),
-                    "internalId": class_data.get("internalId"),
-                }
+            class_name = get_close_matches(row["Class"], class_names, 1, 0.7)
+            if class_name:
+                class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name[0]]
+                if class_data:
+                    class_data = class_data[0].__dict__['__values__']
+                    journal_entry_line["class"] = {
+                        "name": class_data.get("name"),
+                        "externalId": class_data.get("externalId"),
+                        "internalId": class_data.get("internalId"),
+                    }
 
         # Get the NetSuite Department Ref
         if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
             dept_names = [d["name"] for d in ref_data["Departments"]]
-            dept_name = get_close_matches(row["Department"], dept_names, 1, 0.5)[0]
-            dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name]
-            if dept_data:
-                dept_data = dept_data[0].__dict__['__values__']
-                journal_entry_line["department"] = {
-                    "name": dept_data.get("name"),
-                    "externalId": dept_data.get("externalId"),
-                    "internalId": dept_data.get("internalId"),
-                }
+            dept_name = get_close_matches(row["Department"], dept_names, 1, 0.7)
+            if dept_name:
+                dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name[0]]
+                if dept_data:
+                    dept_data = dept_data[0].__dict__['__values__']
+                    journal_entry_line["department"] = {
+                        "name": dept_data.get("name"),
+                        "externalId": dept_data.get("externalId"),
+                        "internalId": dept_data.get("internalId"),
+                    }
 
         # Get the NetSuite Location Ref
         if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):
@@ -179,14 +181,15 @@ def build_lines(x, ref_data):
         # Get the NetSuite Location Ref
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
             customer_names = [c["name"] for c in ref_data["Customer"]]
-            customer_name = get_close_matches(row["Customer Name"], customer_names, 1, 0.5)[0]
-            customer_data = [c for c in ref_data["Customer"] if c["name"] == customer_name]
-            if customer_data:
-                customer_data = customer_data[0].__dict__['__values__']
-                journal_entry_line["entity"] = {
-                    "externalId": customer_data.get("externalId"),
-                    "internalId": customer_data.get("internalId"),
-                }
+            customer_name = get_close_matches(row["Customer Name"], customer_names, 1, 0.7)
+            if customer_name:
+                customer_data = [c for c in ref_data["Customer"] if c["name"] == customer_name[0]]
+                if customer_data:
+                    customer_data = customer_data[0].__dict__['__values__']
+                    journal_entry_line["entity"] = {
+                        "externalId": customer_data.get("externalId"),
+                        "internalId": customer_data.get("internalId"),
+                    }
 
         # Check the Posting Type and insert the Amount
         amount = 0 if pd.isna(row["Amount"]) else abs(round(row["Amount"], 2))

@@ -180,10 +180,24 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Location Ref
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
-            customer_names = [c["name"] for c in ref_data["Customer"]]
+            customer_names = []
+            for c in ref_data["Customer"]:
+                if "name" in c.__dict__['__values__'].keys():
+                    if c["name"]:
+                        customer_names.append(c["name"])
+                else:
+                    if c["companyName"]:
+                        customer_names.append(c["companyName"])
             customer_name = get_close_matches(row["Customer Name"], customer_names, 1, 0.7)
             if customer_name:
-                customer_data = [c for c in ref_data["Customer"] if c["name"] == customer_name[0]]
+                customer_data = []
+                for c in ref_data["Customer"]:
+                    if "name" in c.__dict__['__values__'].keys():
+                        if c["name"] == customer_name[0]:
+                            customer_data.append(c)
+                    else:
+                        if c["companyName"] == customer_name[0]:
+                            customer_data.append(c)
                 if customer_data:
                     customer_data = customer_data[0].__dict__['__values__']
                     journal_entry_line["entity"] = {

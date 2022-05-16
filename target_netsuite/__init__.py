@@ -4,9 +4,10 @@ import json
 import logging
 import os
 import sys
-from difflib import get_close_matches
 
 import pandas as pd
+from difflib import SequenceMatcher
+from heapq import nlargest as _nlargest
 
 from target_netsuite.netsuite import NetSuite
 
@@ -16,6 +17,26 @@ logger = logging.getLogger("target-netsuite")
 logging.basicConfig(
     level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+
+
+def get_close_matches(word, possibilities, n=20, cutoff=0.7):
+    if not n >  0:
+        raise ValueError("n must be > 0: %r" % (n,))
+    if not 0.0 <= cutoff <= 1.0:
+        raise ValueError("cutoff must be in [0.0, 1.0]: %r" % (cutoff,))
+    result = []
+    s = SequenceMatcher()
+    s.set_seq2(word)
+    for x in possibilities:
+        s.set_seq1(x)
+        if s.real_quick_ratio() >= cutoff and \
+           s.quick_ratio() >= cutoff and \
+           s.ratio() >= cutoff:
+            result.append((s.ratio(), x))
+    result = _nlargest(n, result)
+
+    return {v: k for (k, v) in result}
+
 
 
 def load_json(path):
@@ -142,8 +163,9 @@ def build_lines(x, ref_data):
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
             class_names = [c["name"] for c in ref_data["Classifications"]]
-            class_name = get_close_matches(row["Class"], class_names, 1, 0.7)
+            class_name = get_close_matches(row["Class"], class_names)
             if class_name:
+                class_name = max(class_name, key=class_name.get)
                 class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name[0]]
                 if class_data:
                     class_data = class_data[0].__dict__['__values__']
@@ -156,8 +178,9 @@ def build_lines(x, ref_data):
         # Get the NetSuite Department Ref
         if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
             dept_names = [d["name"] for d in ref_data["Departments"]]
-            dept_name = get_close_matches(row["Department"], dept_names, 1, 0.7)
+            dept_name = get_close_matches(row["Department"], dept_names)
             if dept_name:
+                dept_name = max(dept_name, key=dept_name.get)
                 dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name[0]]
                 if dept_data:
                     dept_data = dept_data[0].__dict__['__values__']
@@ -188,8 +211,9 @@ def build_lines(x, ref_data):
                 else:
                     if c["companyName"]:
                         customer_names.append(c["companyName"])
-            customer_name = get_close_matches(row["Customer Name"], customer_names, 1, 0.7)
+            customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
             if customer_name:
+                customer_name = max(customer_name, key=customer_name.get)
                 customer_data = []
                 for c in ref_data["Customer"]:
                     if "name" in c.__dict__['__values__'].keys():

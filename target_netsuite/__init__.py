@@ -217,10 +217,10 @@ def build_lines(x, ref_data):
                 customer_data = []
                 for c in ref_data["Customer"]:
                     if "name" in c.__dict__['__values__'].keys():
-                        if c["name"] == customer_name[0]:
+                        if c["name"] == customer_name:
                             customer_data.append(c)
                     else:
-                        if c["companyName"] == customer_name[0]:
+                        if c["companyName"] == customer_name:
                             customer_data.append(c)
                 if customer_data:
                     customer_data = customer_data[0].__dict__['__values__']

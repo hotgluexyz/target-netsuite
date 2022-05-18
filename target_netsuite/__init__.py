@@ -166,7 +166,7 @@ def build_lines(x, ref_data):
             class_name = get_close_matches(row["Class"], class_names)
             if class_name:
                 class_name = max(class_name, key=class_name.get)
-                class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name[0]]
+                class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name]
                 if class_data:
                     class_data = class_data[0].__dict__['__values__']
                     journal_entry_line["class"] = {
@@ -181,7 +181,7 @@ def build_lines(x, ref_data):
             dept_name = get_close_matches(row["Department"], dept_names)
             if dept_name:
                 dept_name = max(dept_name, key=dept_name.get)
-                dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name[0]]
+                dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name]
                 if dept_data:
                     dept_data = dept_data[0].__dict__['__values__']
                     journal_entry_line["department"] = {

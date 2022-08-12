@@ -83,9 +83,6 @@ def get_ns_client(config):
         is_sandbox=is_sandbox,
     )
 
-    # enable this when using local
-    # s.connect_tba(caching=True)
-
     ns.connect_tba(caching=False)
     logger.info(f"Successfully created netsuite connection..")
     return ns
@@ -97,30 +94,30 @@ def get_reference_data(ns_client, input_data):
     try:
         if "Location" in input_data.columns:
             if not input_data["Location"].dropna().empty:
-                reference_data["Locations"] = ns_client.locations.get_all()
+                reference_data["Locations"] = ns_client.entities["Locations"].get_all(["name"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"].get_all()
+            reference_data["Customer"] = ns_client.entities["Customer"].get_all(["name", "companyName"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
     
-    if not input_data["Account Number"].dropna().empty:
-        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all()
-    
     if not input_data["Class"].dropna().empty:
-        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all()
+        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all(["name"])
     
     if not input_data["Currency"].dropna().empty:
-        reference_data["Currencies"] = ns_client.currencies.get_all()
+        reference_data["Currencies"] = ns_client.entities["Currencies"].get_all()
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
-            reference_data["Departments"] = ns_client.departments.get_all()
+            reference_data["Departments"] = ns_client.entities["Departments"].get_all(["name"])
+        
+    if not input_data["Account Number"].dropna().empty:
+        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all(["acctName", "acctNumber", "subsidiaryList"])
 
     return reference_data
 
@@ -138,7 +135,7 @@ def build_lines(x, ref_data):
             if not acct_data:
                 logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
                 continue
-            acct_data = acct_data[0].__dict__['__values__']
+            acct_data = acct_data[0]
             ref_acct = {
                 "name": acct_data.get("acctName"),
                 "externalId": acct_data.get("externalId"),
@@ -150,8 +147,11 @@ def build_lines(x, ref_data):
             if row.get("Subsidiary"):
                 subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
             else:
-                subsidiary = acct_data['subsidiaryList']['recordRef']
-                subsidiary = subsidiary[0].__dict__['__values__'] if subsidiary else None
+                if acct_data['subsidiaryList']:
+                    subsidiary = acct_data['subsidiaryList']['recordRef']
+                    subsidiary = subsidiary[0] if subsidiary else None
+                else:
+                    subsidiary = None
             if subsidiary:
                 if row["Posting Type"].lower() == "credit":
                     subsidiaries["toSubsidiary"] = subsidiary
@@ -168,7 +168,7 @@ def build_lines(x, ref_data):
                 class_name = max(class_name, key=class_name.get)
                 class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name]
                 if class_data:
-                    class_data = class_data[0].__dict__['__values__']
+                    class_data = class_data[0]
                     journal_entry_line["class"] = {
                         "name": class_data.get("name"),
                         "externalId": class_data.get("externalId"),
@@ -183,7 +183,7 @@ def build_lines(x, ref_data):
                 dept_name = max(dept_name, key=dept_name.get)
                 dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name]
                 if dept_data:
-                    dept_data = dept_data[0].__dict__['__values__']
+                    dept_data = dept_data[0]
                     journal_entry_line["department"] = {
                         "name": dept_data.get("name"),
                         "externalId": dept_data.get("externalId"),
@@ -194,7 +194,7 @@ def build_lines(x, ref_data):
         if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):
             loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
             if loc_data:
-                loc_data = loc_data[0].__dict__['__values__']
+                loc_data = loc_data[0]
                 journal_entry_line["location"] = {
                     "name": loc_data.get("name"),
                     "externalId": loc_data.get("externalId"),
@@ -205,7 +205,7 @@ def build_lines(x, ref_data):
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
             customer_names = []
             for c in ref_data["Customer"]:
-                if "name" in c.__dict__['__values__'].keys():
+                if "name" in c.keys():
                     if c["name"]:
                         customer_names.append(c["name"])
                 else:
@@ -216,14 +216,14 @@ def build_lines(x, ref_data):
                 customer_name = max(customer_name, key=customer_name.get)
                 customer_data = []
                 for c in ref_data["Customer"]:
-                    if "name" in c.__dict__['__values__'].keys():
+                    if "name" in c.keys():
                         if c["name"] == customer_name:
                             customer_data.append(c)
                     else:
                         if c["companyName"] == customer_name:
                             customer_data.append(c)
                 if customer_data:
-                    customer_data = customer_data[0].__dict__['__values__']
+                    customer_data = customer_data[0]
                     journal_entry_line["entity"] = {
                         "externalId": customer_data.get("externalId"),
                         "internalId": customer_data.get("internalId"),

@@ -14,18 +14,6 @@ def _get_abs_path(path: str) -> str:
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
 
 
-def _load_object_definitions() -> Dict:
-    """Loads a JSON schema file for a given
-    NetSuite Report resource into a dict representation.
-    """
-    schema_path = _get_abs_path("schemas")
-    return singer.utils.load_json(f"{schema_path}/object_definition.json")
-
-
-NS_OBJECT_DEFINITIONS = _load_object_definitions()
-NS_OBJECTS = NS_OBJECT_DEFINITIONS.keys()
-
-
 def field_to_property_schema(field, mdata):  # pylint:disable=too-many-branches
 
     number_type = {

@@ -94,30 +94,30 @@ def get_reference_data(ns_client, input_data):
     try:
         if "Location" in input_data.columns:
             if not input_data["Location"].dropna().empty:
-                reference_data["Locations"] = ns_client.entities["Locations"].get_all(["name"])
+                reference_data["Locations"] = ns_client.entities["Locations"](ns_client.client).get_all(["name"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"].get_all(["name", "companyName"])
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["name", "companyName"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
     
     if not input_data["Class"].dropna().empty:
-        reference_data["Classifications"] = ns_client.entities["Classifications"].get_all(["name"])
+        reference_data["Classifications"] = ns_client.entities["Classifications"](ns_client.client).get_all(["name"])
     
     if not input_data["Currency"].dropna().empty:
-        reference_data["Currencies"] = ns_client.entities["Currencies"].get_all()
+        reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
-            reference_data["Departments"] = ns_client.entities["Departments"].get_all(["name"])
+            reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name"])
         
     if not input_data["Account Number"].dropna().empty:
-        reference_data["Accounts"] = ns_client.entities["Accounts"].get_all(["acctName", "acctNumber", "subsidiaryList"])
+        reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList"])
 
     return reference_data
 
@@ -148,8 +148,11 @@ def build_lines(x, ref_data):
                 subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
             else:
                 if acct_data['subsidiaryList']:
-                    subsidiary = acct_data['subsidiaryList']['recordRef']
-                    subsidiary = subsidiary[0] if subsidiary else None
+                    if isinstance(acct_data['subsidiaryList'], list):
+                        subsidiary = acct_data['subsidiaryList'][0]
+                    else:
+                        subsidiary = acct_data['subsidiaryList']['recordRef']
+                        subsidiary = subsidiary[0] if subsidiary else None
                 else:
                     subsidiary = None
             if subsidiary:

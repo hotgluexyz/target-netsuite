@@ -14,8 +14,8 @@ class ExtendedNetSuiteConnection:
         # NetSuiteConnection.__init__(self, account, consumer_key, consumer_secret, token_key, token_secret)
         # ns_client: NetSuiteClient = self.client
 
-        ns_client = ExtendedNetSuiteClient(account=account, caching=caching)
-        ns_client.connect_tba(
+        self.client = ExtendedNetSuiteClient(account=account, caching=caching)
+        self.client.connect_tba(
             consumer_key=consumer_key,
             consumer_secret=consumer_secret,
             token_key=token_key,
@@ -23,13 +23,13 @@ class ExtendedNetSuiteConnection:
         )
 
         self.entities = {
-            'Customer': Customers(ns_client),
-            'Accounts': Accounts(ns_client),
-            'JournalEntry': JournalEntries(ns_client),
-            'Classifications': Classifications(ns_client),
-            'Currencies': Currencies(ns_client),
-            'Locations': Locations(ns_client),
-            'Departments': Departments(ns_client)
+            'Customer': Customers,
+            'Accounts': Accounts,
+            'JournalEntry': JournalEntries,
+            'Classifications': Classifications,
+            'Currencies': Currencies,
+            'Locations': Locations,
+            'Departments': Departments
         }
 
     def _query_entity(self, data, entity, stream):

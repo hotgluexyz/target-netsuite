@@ -40,12 +40,7 @@ class BaseFilter(ApiBase):
 class Customers(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='customer')
-
-        ns_client._search_preferences = ns_client.SearchPreferences(
-                bodyFieldsOnly=True,
-                pageSize=1000,
-                returnSearchColumns=True
-            )
+        self.require_lastModified_date = True
 
     def get_all_generator(self, page_size=1000, last_modified_date=None):
         search_record = self.ns_client.basic_search_factory(type_name="Customer",
@@ -63,28 +58,15 @@ class Locations(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Location')
 
-        ns_client._search_preferences = ns_client.SearchPreferences(
-                bodyFieldsOnly=True,
-                pageSize=1000,
-                returnSearchColumns=True
-            )
-
 
 class Departments(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Department')
 
-        ns_client._search_preferences = ns_client.SearchPreferences(
-                bodyFieldsOnly=True,
-                pageSize=1000,
-                returnSearchColumns=True
-            )
-
 
 class Accounts(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Account')
-    
         ns_client._search_preferences = ns_client.SearchPreferences(
                 bodyFieldsOnly=False,
                 pageSize=1000,
@@ -95,12 +77,6 @@ class Accounts(BaseFilter):
 class Classifications(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Classification')
-
-        ns_client._search_preferences = ns_client.SearchPreferences(
-                bodyFieldsOnly=True,
-                pageSize=1000,
-                returnSearchColumns=True
-            )
 
 
 class JournalEntries(ApiBase):

@@ -304,7 +304,7 @@ def load_journal_entries(input_data, reference_data):
 def post_journal_entries(journal, ns_client):
         entity = "JournalEntry"
         # logger.info(f"Posting data for entity {1}")
-        response = ns_client.entities[entity].post(journal)
+        response = ns_client.entities[entity](ns_client.client).post(journal)
         return json.dumps({entity: response}, default=str, indent=2)
 
 

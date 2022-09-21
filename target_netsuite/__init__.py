@@ -129,6 +129,8 @@ def build_lines(x, ref_data):
     # Create line items
     for _, row in x.iterrows():
         # Get the NetSuite Account Ref
+        if pd.isna(row.get("Account Number")):
+            raise TypeError(f"Account Number is required")
         if ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
             acct_num = str(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]

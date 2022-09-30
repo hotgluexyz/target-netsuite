@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='target-netsuite',
-    version='1.0.17',
+    version='1.0.18',
     description='hotglue target for exporting data to NetSuite',
     author='hotglue',
     url='https://hotglue.xyz',

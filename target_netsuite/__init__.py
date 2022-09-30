@@ -217,7 +217,7 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Location Ref
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
-            # journal_entry_line = {}
+
             customer_names = []
             for c in ref_data["Customer"]:
                 if "name" in c.keys():

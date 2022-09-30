@@ -116,7 +116,7 @@ def get_reference_data(ns_client, input_data):
         if not input_data["Department"].dropna().empty:
             reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name"])
         
-    if not input_data["Account Number"].dropna().empty:
+    if not input_data["Account Number"].dropna().empty or not input_data["Account Name"].dropna().empty:
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList"])
 
     return reference_data
@@ -128,42 +128,51 @@ def build_lines(x, ref_data):
     subsidiaries = {}
     # Create line items
     for _, row in x.iterrows():
-        # Get the NetSuite Account Ref
-        if pd.isna(row.get("Account Number")):
-            raise TypeError(f"Account Number is required")
+        #  Using Account Number if provided 
         if ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
             acct_num = str(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
                 logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
                 continue
-            acct_data = acct_data[0]
-            ref_acct = {
-                "name": acct_data.get("acctName"),
-                "externalId": acct_data.get("externalId"),
-                "internalId": acct_data.get("internalId"),
-            }
-            journal_entry_line = {"account": ref_acct}
 
-            # Extract the subsidiaries from Account
-            if row.get("Subsidiary"):
-                subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
+        # Using Account Name if provided
+        elif ref_data.get("Accounts") and row.get("Account Name") and not pd.isna(row.get("Account Name")):
+            acct_name = str(row["Account Name"])
+            acct_data = [a for a in ref_data["Accounts"] if a["acctName"] == acct_name]
+            if not acct_data:
+                logger.warning(f"{acct_name} is not valid for this netsuite account, skipping line")
+                continue
+        else: 
+            raise TypeError(f"Account Number or Account Name is required")
+
+        acct_data = acct_data[0]
+        ref_acct = {
+            "name": acct_data.get("acctName"),
+            "externalId": acct_data.get("externalId"),
+            "internalId": acct_data.get("internalId"),
+        }
+        journal_entry_line = {"account": ref_acct}
+
+        # Extract the subsidiaries from Account
+        if not pd.isna(row.get("Subsidiary")):
+            subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
+        else:
+            if acct_data['subsidiaryList']:
+                if isinstance(acct_data['subsidiaryList'], list):
+                    subsidiary = acct_data['subsidiaryList'][0]
+                else:
+                    subsidiary = acct_data['subsidiaryList']['recordRef']
+                    subsidiary = subsidiary[0] if subsidiary else None
             else:
-                if acct_data['subsidiaryList']:
-                    if isinstance(acct_data['subsidiaryList'], list):
-                        subsidiary = acct_data['subsidiaryList'][0]
-                    else:
-                        subsidiary = acct_data['subsidiaryList']['recordRef']
-                        subsidiary = subsidiary[0] if subsidiary else None
-                else:
-                    subsidiary = None
-            if subsidiary:
-                if row["Posting Type"].lower() == "credit":
-                    subsidiaries["toSubsidiary"] = subsidiary
-                elif row["Posting Type"].lower() == "debit":
-                    subsidiaries["subsidiary"] = subsidiary
-                else:
-                    raise('Posting Type must be "credit" or "debit"')
+                subsidiary = None
+        if subsidiary:
+            if row["Posting Type"].lower() == "credit":
+                subsidiaries["toSubsidiary"] = subsidiary
+            elif row["Posting Type"].lower() == "debit":
+                subsidiaries["subsidiary"] = subsidiary
+            else:
+                raise('Posting Type must be "credit" or "debit"')
 
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
@@ -208,6 +217,7 @@ def build_lines(x, ref_data):
 
         # Get the NetSuite Location Ref
         if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
+            # journal_entry_line = {}
             customer_names = []
             for c in ref_data["Customer"]:
                 if "name" in c.keys():

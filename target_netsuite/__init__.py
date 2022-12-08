@@ -111,6 +111,9 @@ def get_reference_data(ns_client, input_data):
     
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
+
+    if not input_data["Subsidiary"].dropna().empty:
+        reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
@@ -154,9 +157,25 @@ def build_lines(x, ref_data):
         }
         journal_entry_line = {"account": ref_acct}
 
-        # Extract the subsidiaries from Account
+        # Get subsidiary
         if not pd.isna(row.get("Subsidiary")):
-            subsidiary = dict(name=None, internalId=row.get("Subsidiary"), externalId=None, type=None)
+            subsidiary_names = [s["name"] for s in ref_data["Subsidiaries"]]
+            subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
+            if subsidiary_name:
+                subsidiary_name = max(subsidiary_name, key=subsidiary_name.get)
+                subsidiary_data = [s for s in ref_data["Subsidiaries"] if s["name"]==subsidiary_name]
+                if subsidiary_data:
+                    subsidiary_data = subsidiary_data[0]
+                    subsidiary = {
+                        "name": None,
+                        "externalId": None,
+                        "internalId": subsidiary_data.get("internalId"),
+                    }
+                else:
+                    subsidiary = None
+            else:
+                subsidiary = None
+        # Extract the subsidiaries from Account
         else:
             if acct_data['subsidiaryList']:
                 if isinstance(acct_data['subsidiaryList'], list):

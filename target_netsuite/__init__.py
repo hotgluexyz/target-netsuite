@@ -112,8 +112,9 @@ def get_reference_data(ns_client, input_data):
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
 
-    if not input_data["Subsidiary"].dropna().empty:
-        reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name"])
+    if "Subsidiary" in input_data.columns:
+        if not input_data["Subsidiary"].dropna().empty:
+            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:

@@ -344,7 +344,7 @@ def read_input_data(config):
     # Get input path
     input_path = f"{config['input_path']}/JournalEntries.csv"
     # Read the passed CSV
-    input_data = pd.read_csv(input_path, na_values=['', '#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'N/A', 'NULL', 'NaN', 'n/a', 'nan', 'null'])
+    input_data = pd.read_csv(input_path, keep_default_na=False, na_values=['', '#N/A', '#N/A N/A', '#NA', '-1.#IND', '-1.#QNAN', '-NaN', '-nan', '1.#IND', '1.#QNAN', '<NA>', 'NULL', 'NaN', 'n/a', 'nan', 'null'])
     cols = list(input_data.columns)
     REQUIRED_COLS = [
         "Transaction Date",

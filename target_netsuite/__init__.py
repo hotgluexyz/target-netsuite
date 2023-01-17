@@ -101,7 +101,7 @@ def get_reference_data(ns_client, input_data):
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["name", "companyName"])
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "companyName"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -243,6 +243,9 @@ def build_lines(x, ref_data):
                 if "name" in c.keys():
                     if c["name"]:
                         customer_names.append(c["name"])
+                elif "altName" in c.keys():
+                    if c["altName"]:
+                        customer_names.append(c["altName"])
                 else:
                     if c["companyName"]:
                         customer_names.append(c["companyName"])

@@ -119,6 +119,10 @@ def get_reference_data(ns_client, input_data):
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
             reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name"])
+
+    if "SKU" in input_data.columns:
+        if not input_data["SKU"].dropna().empty:
+            reference_data["Items"] = ns_client.entities["Items"](ns_client.client).get_all(["ItemId"])
         
     if not input_data["Account Number"].dropna().empty or not input_data["Account Name"].dropna().empty:
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList"])
@@ -126,7 +130,7 @@ def get_reference_data(ns_client, input_data):
     return reference_data
 
 
-def build_lines(x, ref_data):
+def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
@@ -266,6 +270,12 @@ def build_lines(x, ref_data):
                         "externalId": customer_data.get("externalId"),
                         "internalId": customer_data.get("internalId"),
                     }
+        
+        if ref_data.get("Items") and row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
+            external_id = config.get("sku_custom_field")
+            item_id = next((i["internalId"] for i in ref_data["Items"] if i["externalId"]==row["SKU"]), None)
+            if item_id:
+                journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": external_id, "value": item_id}]
 
         # Check the Posting Type and insert the Amount
         amount = 0 if pd.isna(row["Amount"]) else abs(round(row["Amount"], 2))
@@ -323,10 +333,10 @@ def build_lines(x, ref_data):
     return journal_entry
 
 
-def load_journal_entries(input_data, reference_data):
+def load_journal_entries(input_data, reference_data, config):
     # Build the entries
     try:
-        lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data)
+        lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 
@@ -377,7 +387,7 @@ def upload_journals(config, ns_client):
     reference_data = get_reference_data(ns_client, input_data)
 
     # Load Journal Entries CSV to post + Convert to NetSuite format
-    journals = load_journal_entries(input_data, reference_data)
+    journals = load_journal_entries(input_data, reference_data, config)
 
     # Post the journal entries to Netsuite
     for journal in journals:

@@ -84,10 +84,20 @@ class Classifications(BaseFilter):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Classification')
 
 
+class Items(BaseFilter):
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='Item')
+
+
 class JournalEntries(ApiBase):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='journalEntry')
         self.require_lastModified_date = True
+        ns_client._search_preferences = ns_client.SearchPreferences(
+                bodyFieldsOnly=False,
+                pageSize=1000,
+                returnSearchColumns=True
+            )
 
     def get_all(self, last_modified_date=None):
         return list(self.get_all_generator() if last_modified_date is None else self.get_all_generator(
@@ -129,7 +139,6 @@ class JournalEntries(ApiBase):
                         )
                     )
             return self.ns_client.CustomFieldList(custom_fields)
-
         return None
 
     def post(self, data) -> OrderedDict:
@@ -144,6 +153,9 @@ class JournalEntries(ApiBase):
         je['lineList'] = self.ns_client.JournalEntryLineList(line=line_list)
         je['currency'] = self.ns_client.RecordRef(**(data['currency']))
 
+        if 'customFieldList' in data:
+            je['customFieldList'] = data['customFieldList']
+        
         if 'memo' in data:
             je['memo'] = data['memo']
 

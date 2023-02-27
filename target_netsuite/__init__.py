@@ -244,15 +244,12 @@ def build_lines(x, ref_data, config):
 
             customer_names = []
             for c in ref_data["Customer"]:
-                if "name" in c.keys():
-                    if c["name"]:
-                        customer_names.append(c["name"])
-                elif "altName" in c.keys():
-                    if c["altName"]:
-                        customer_names.append(c["altName"])
-                else:
-                    if c["companyName"]:
-                        customer_names.append(c["companyName"])
+                if c.get("name"):
+                    customer_names.append(c["name"])
+                elif c.get("altName"):
+                    customer_names.append(c["altName"])
+                elif c.get("companyName"):
+                    customer_names.append(c["companyName"])
             customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
             if customer_name:
                 customer_name = max(customer_name, key=customer_name.get)

@@ -101,7 +101,7 @@ def get_reference_data(ns_client, input_data):
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "companyName"])
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "entityId", "companyName"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -246,9 +246,11 @@ def build_lines(x, ref_data, config):
             for c in ref_data["Customer"]:
                 if c.get("name"):
                     customer_names.append(c["name"])
-                elif c.get("altName"):
+                if c.get("entityId"):
+                    customer_names.append(c["entityId"])
+                if c.get("altName"):
                     customer_names.append(c["altName"])
-                elif c.get("companyName"):
+                if c.get("companyName"):
                     customer_names.append(c["companyName"])
             customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
             if customer_name:
@@ -258,7 +260,13 @@ def build_lines(x, ref_data, config):
                     if "name" in c.keys():
                         if c["name"] == customer_name:
                             customer_data.append(c)
-                    else:
+                    if "entityId" in c.keys():
+                        if c["entityId"] == customer_name:
+                            customer_data.append(c)
+                    if "altName" in c.keys():
+                        if c["altName"] == customer_name:
+                            customer_data.append(c)
+                    if "companyName" in c.keys():
                         if c["companyName"] == customer_name:
                             customer_data.append(c)
                 if customer_data:

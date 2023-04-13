@@ -107,7 +107,7 @@ def get_reference_data(ns_client, input_data):
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
     
     if not input_data["Class"].dropna().empty:
-        reference_data["Classifications"] = ns_client.entities["Classifications"](ns_client.client).get_all(["name"])
+        reference_data["Classifications"] = ns_client.entities["Classifications"](ns_client.client).get_all(["name", "parent"])
     
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
@@ -200,7 +200,13 @@ def build_lines(x, ref_data, config):
 
         # Get the NetSuite Class Ref
         if ref_data.get("Classifications") and row.get("Class") and not pd.isna(row.get("Class")):
-            class_names = [c["name"] for c in ref_data["Classifications"]]
+            class_parent_names = [
+                c["parent"]["name"] + " : " + c["name"]
+                for c in ref_data["Classifications"]
+                if c.get("parent") is not None
+            ]
+            class_noparent_names = [c["name"] for c in ref_data["Classifications"] if c.get("parent") is None]
+            class_names = class_parent_names + class_noparent_names
             class_name = get_close_matches(row["Class"], class_names)
             if class_name:
                 class_name = max(class_name, key=class_name.get)

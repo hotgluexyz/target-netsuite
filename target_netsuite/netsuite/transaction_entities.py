@@ -22,7 +22,7 @@ class BaseFilter(ApiBase):
                 rec_dict = {}
                 for k, v in record.items():
                     if k in selected_fileds:
-                        if getattr(v, "__dict__", None):
+                        if getattr(v, "__dict__", None) and v.__dict__["__values__"].get("recordRef"):
                             values = v.__dict__["__values__"]["recordRef"]
                             rec_dict[k] = [dict(value.__dict__["__values__"]) for value in values]
                         else:

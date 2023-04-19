@@ -210,7 +210,7 @@ def build_lines(x, ref_data, config):
             class_name = get_close_matches(row["Class"], class_names)
             if class_name:
                 class_name = max(class_name, key=class_name.get)
-                class_data = [c for c in ref_data["Classifications"] if c["name"]==class_name]
+                class_data = [c for c in ref_data["Classifications"] if (c.get("parent") and (c["parent"]["name"] + " : " + c["name"]) == class_name) or (c["name"]==class_name)]
                 if class_data:
                     class_data = class_data[0]
                     journal_entry_line["class"] = {

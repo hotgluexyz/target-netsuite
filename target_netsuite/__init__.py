@@ -88,7 +88,7 @@ def get_ns_client(config):
     return ns
 
 def get_reference_data(ns_client, input_data):
-    logger.info(f"Readding data from API...")
+    logger.info(f"Reading reference data from API...")
     reference_data = {}
 
     try:
@@ -282,11 +282,12 @@ def build_lines(x, ref_data, config):
                         "internalId": customer_data.get("internalId"),
                     }
         
-        if ref_data.get("Items") and row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
+        # if ref_data.get("Items") and row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
+        if row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
             external_id = config.get("sku_custom_field")
-            item_id = next((i["internalId"] for i in ref_data["Items"] if i["externalId"]==row["SKU"]), None)
-            if item_id:
-                journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": external_id, "value": item_id}]
+            # item_id = next((i["internalId"] for i in ref_data["Items"] if i["externalId"]==row["SKU"]), None)
+            # if item_id:
+            journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": external_id, "value": row['SKU']}]
 
         # Check the Posting Type and insert the Amount
         amount = 0 if pd.isna(row["Amount"]) else abs(round(row["Amount"], 2))

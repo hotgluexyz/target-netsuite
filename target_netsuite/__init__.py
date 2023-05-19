@@ -114,11 +114,11 @@ def get_reference_data(ns_client, input_data):
 
     if "Subsidiary" in input_data.columns:
         if not input_data["Subsidiary"].dropna().empty:
-            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name"])
+            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
-            reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name"])
+            reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name", "parent"])
 
     if "SKU" in input_data.columns:
         if not input_data["SKU"].dropna().empty:

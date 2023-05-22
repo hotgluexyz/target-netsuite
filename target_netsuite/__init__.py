@@ -114,11 +114,11 @@ def get_reference_data(ns_client, input_data):
 
     if "Subsidiary" in input_data.columns:
         if not input_data["Subsidiary"].dropna().empty:
-            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name"])
+            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
-            reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name"])
+            reference_data["Departments"] = ns_client.entities["Departments"](ns_client.client).get_all(["name", "parent"])
 
     if "SKU" in input_data.columns:
         if not input_data["SKU"].dropna().empty:
@@ -164,11 +164,17 @@ def build_lines(x, ref_data, config):
 
         # Get subsidiary
         if not pd.isna(row.get("Subsidiary")):
-            subsidiary_names = [s["name"] for s in ref_data["Subsidiaries"]]
+            subsidiary_parent_names = [
+                s["parent"]["name"] + " : " + s["name"]
+                for s in ref_data["Subsidiaries"]
+                if s.get("parent") is not None
+            ]
+            subsidiary_noparent_names = [s["name"] for s in ref_data["Subsidiaries"] if s.get("parent") is None]
+            subsidiary_names = subsidiary_parent_names + subsidiary_noparent_names
             subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
             if subsidiary_name:
                 subsidiary_name = max(subsidiary_name, key=subsidiary_name.get)
-                subsidiary_data = [s for s in ref_data["Subsidiaries"] if s["name"]==subsidiary_name]
+                subsidiary_data = [s for s in ref_data["Subsidiaries"] if (s.get("parent") and (s["parent"]["name"] + " : " + s["name"]) == subsidiary_name) or (s["name"]==subsidiary_name)]
                 if subsidiary_data:
                     subsidiary_data = subsidiary_data[0]
                     subsidiary = {
@@ -221,11 +227,17 @@ def build_lines(x, ref_data, config):
 
         # Get the NetSuite Department Ref
         if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
-            dept_names = [d["name"] for d in ref_data["Departments"]]
+            department_parent_names = [
+                c["parent"]["name"] + " : " + c["name"]
+                for c in ref_data["Departments"]
+                if c.get("parent") is not None
+            ]
+            department_noparent_names = [d["name"] for d in ref_data["Departments"] if d.get("parent") is None]
+            dept_names = department_parent_names + department_noparent_names
             dept_name = get_close_matches(row["Department"], dept_names)
             if dept_name:
                 dept_name = max(dept_name, key=dept_name.get)
-                dept_data = [d for d in ref_data["Departments"] if d["name"] == dept_name]
+                dept_data = [d for d in ref_data["Departments"] if (d.get("parent") and (d["parent"]["name"] + " : " + d["name"]) == dept_name) or (d["name"] == dept_name)]
                 if dept_data:
                     dept_data = dept_data[0]
                     journal_entry_line["department"] = {

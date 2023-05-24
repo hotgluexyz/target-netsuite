@@ -417,6 +417,8 @@ def upload_journals(config, ns_client):
     for journal in journals:
         post_journal_entries(journal, ns_client)
 
+    logger.info(f"Posted journal entries: ")
+    logger.info(f"{json.dumps(journals)}")
 
 def upload(config, args):
     # Login to NetSuite

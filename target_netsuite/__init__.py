@@ -122,7 +122,7 @@ def get_reference_data(ns_client, input_data):
 
     if "SKU" in input_data.columns:
         if not input_data["SKU"].dropna().empty:
-            reference_data["Items"] = ns_client.entities["Items"](ns_client.client).get_all(["ItemId"])
+            reference_data["Items"] = ns_client.entities["Items"](ns_client.client).get_all(["itemId"])
         
     if not input_data["Account Number"].dropna().empty or not input_data["Account Name"].dropna().empty:
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList"])
@@ -284,7 +284,7 @@ def build_lines(x, ref_data, config):
         
         if ref_data.get("Items") and row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
             external_id = config.get("sku_custom_field")
-            item_id = next((i["internalId"] for i in ref_data["Items"] if i["externalId"]==row["SKU"]), None)
+            item_id = next((i["internalId"] for i in ref_data["Items"] if (i["externalId"]==row["SKU"] or i['itemId'] == row["SKU"])), None)
             if item_id:
                 journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": external_id, "value": item_id}]
 

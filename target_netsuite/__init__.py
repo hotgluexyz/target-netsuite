@@ -381,11 +381,11 @@ def load_journal_entries(input_data, reference_data, config):
     return lines.values
 
 
-# def post_journal_entries(journal, ns_client):
-#         entity = "JournalEntry"
-#         # logger.info(f"Posting data for entity {1}")
-#         response = ns_client.entities[entity](ns_client.client).post(journal)
-#         return json.dumps({entity: response}, default=str, indent=2)
+def post_journal_entries(journal, ns_client):
+        entity = "JournalEntry"
+        # logger.info(f"Posting data for entity {1}")
+        response = ns_client.entities[entity](ns_client.client).post(journal)
+        return json.dumps({entity: response}, default=str, indent=2)
 
 
 def read_input_data(config):
@@ -425,8 +425,8 @@ def upload_journals(config, ns_client):
     journals = load_journal_entries(input_data, reference_data, config)
 
     # Post the journal entries to Netsuite
-    # for journal in journals:
-    #     post_journal_entries(journal, ns_client)
+    for journal in journals:
+        post_journal_entries(journal, ns_client)
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")

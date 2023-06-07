@@ -246,41 +246,51 @@ def build_lines(x, ref_data, config):
                 }
 
         # Get the NetSuite Location Ref
-        if ref_data.get("Customer") and row.get("Customer Name") and not pd.isna(row.get("Customer Name")):
-
-            customer_names = []
-            for c in ref_data["Customer"]:
-                if c.get("name"):
-                    customer_names.append(c["name"])
-                if c.get("entityId"):
-                    customer_names.append(c["entityId"])
-                if c.get("altName"):
-                    customer_names.append(c["altName"])
-                if c.get("companyName"):
-                    customer_names.append(c["companyName"])
-            customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
-            if customer_name:
-                customer_name = max(customer_name, key=customer_name.get)
-                customer_data = []
+        customer_name = row.get("Customer Name")
+        customer_id = row.get("Customer ID")
+        if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
+            if customer_id: 
+                customer = list(filter(lambda x: x['entityId'] == customer_id, ref_data['Customer']))
+            
+            if not customer_id or not customer:
+                customer_names = []
                 for c in ref_data["Customer"]:
-                    if "name" in c.keys():
-                        if c["name"] == customer_name:
-                            customer_data.append(c)
-                    if "entityId" in c.keys():
-                        if c["entityId"] == customer_name:
-                            customer_data.append(c)
-                    if "altName" in c.keys():
-                        if c["altName"] == customer_name:
-                            customer_data.append(c)
-                    if "companyName" in c.keys():
-                        if c["companyName"] == customer_name:
-                            customer_data.append(c)
-                if customer_data:
-                    customer_data = customer_data[0]
-                    journal_entry_line["entity"] = {
-                        "externalId": customer_data.get("externalId"),
-                        "internalId": customer_data.get("internalId"),
-                    }
+                    if c.get("name"):
+                        customer_names.append(c["name"])
+                    if c.get("entityId"):
+                        customer_names.append(c["entityId"])
+                    if c.get("altName"):
+                        customer_names.append(c["altName"])
+                    if c.get("companyName"):
+                        customer_names.append(c["companyName"])
+                customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
+                if customer_name:
+                    customer_name = max(customer_name, key=customer_name.get)
+                    customer_data = []
+                    for c in ref_data["Customer"]:
+                        if "name" in c.keys():
+                            if c["name"] == customer_name:
+                                customer_data.append(c)
+                        if "entityId" in c.keys():
+                            if c["entityId"] == customer_name:
+                                customer_data.append(c)
+                        if "altName" in c.keys():
+                            if c["altName"] == customer_name:
+                                customer_data.append(c)
+                        if "companyName" in c.keys():
+                            if c["companyName"] == customer_name:
+                                customer_data.append(c)
+                    if customer_data:
+                        customer_data = customer_data[0]
+                        journal_entry_line["entity"] = {
+                            "externalId": customer_data.get("externalId"),
+                            "internalId": customer_data.get("internalId"),
+                        }
+            else: 
+                journal_entry_line = { 
+                    "externalId": customer[0].get("externalId"),
+                    "internalId": customer[0].get("internalId")
+                }
         
         if ref_data.get("Items") and row.get("SKU") and not pd.isna(row.get("SKU")) and config.get("sku_custom_field"):
             external_id = config.get("sku_custom_field")

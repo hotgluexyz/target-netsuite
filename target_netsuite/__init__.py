@@ -26,9 +26,9 @@ def get_close_matches(word, possibilities, n=20, cutoff=0.7):
         raise ValueError("cutoff must be in [0.0, 1.0]: %r" % (cutoff,))
     result = []
     s = SequenceMatcher()
-    s.set_seq2(word)
+    s.set_seq2(word.lower())
     for x in possibilities:
-        s.set_seq1(x)
+        s.set_seq1(x.lower())
         if s.real_quick_ratio() >= cutoff and \
            s.quick_ratio() >= cutoff and \
            s.ratio() >= cutoff:

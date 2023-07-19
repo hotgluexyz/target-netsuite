@@ -272,14 +272,14 @@ def build_lines(x, ref_data, config):
                 customer_names = []
                 for c in ref_data["Customer"]:
                     if c.get("name"):
-                        customer_names.append(c["name"])
+                        customer_names.append(c["name"].lower())
                     if c.get("entityId"):
-                        customer_names.append(c["entityId"])
+                        customer_names.append(c["entityId"].lower())
                     if c.get("altName"):
-                        customer_names.append(c["altName"])
+                        customer_names.append(c["altName"].lower())
                     if c.get("companyName"):
-                        customer_names.append(c["companyName"])
-                customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
+                        customer_names.append(c["companyName"].lower())
+                customer_name = get_close_matches(row["Customer Name"].lower(), customer_names, n=2, cutoff=0.95)
                 if customer_name:
                     customer_name = max(customer_name, key=customer_name.get)
                     customer_data = []

@@ -285,16 +285,16 @@ def build_lines(x, ref_data, config):
                     customer_data = []
                     for c in ref_data["Customer"]:
                         if "name" in c.keys():
-                            if c["name"] == customer_name:
+                            if c["name"].lower() == customer_name:
                                 customer_data.append(c)
                         if "entityId" in c.keys():
-                            if c["entityId"] == customer_name:
+                            if c["entityId"].lower() == customer_name:
                                 customer_data.append(c)
                         if "altName" in c.keys():
-                            if c["altName"] == customer_name:
+                            if c["altName"].lower() == customer_name:
                                 customer_data.append(c)
                         if "companyName" in c.keys():
-                            if c["companyName"] == customer_name:
+                            if c["companyName"].lower() == customer_name:
                                 customer_data.append(c)
                     if customer_data:
                         customer_data = customer_data[0]

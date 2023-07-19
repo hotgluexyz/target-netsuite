@@ -11,7 +11,7 @@ setup(
     classifiers=['Programming Language :: Python :: 3 :: Only'],
     py_modules=['target_netsuite'],
     install_requires=[
-        'requests==2.31.0',
+        'requests==2.20.0',
         'pandas==1.3.4',
         'argparse==1.4.0',
         'netsuitesdk==2.7.0',

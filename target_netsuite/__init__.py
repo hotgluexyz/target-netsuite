@@ -26,9 +26,9 @@ def get_close_matches(word, possibilities, n=20, cutoff=0.7):
         raise ValueError("cutoff must be in [0.0, 1.0]: %r" % (cutoff,))
     result = []
     s = SequenceMatcher()
-    s.set_seq2(word)
+    s.set_seq2(word.lower())
     for x in possibilities:
-        s.set_seq1(x)
+        s.set_seq1(x.lower())
         if s.real_quick_ratio() >= cutoff and \
            s.quick_ratio() >= cutoff and \
            s.ratio() >= cutoff:
@@ -272,29 +272,29 @@ def build_lines(x, ref_data, config):
                 customer_names = []
                 for c in ref_data["Customer"]:
                     if c.get("name"):
-                        customer_names.append(c["name"].lower())
+                        customer_names.append(c["name"])
                     if c.get("entityId"):
-                        customer_names.append(c["entityId"].lower())
+                        customer_names.append(c["entityId"])
                     if c.get("altName"):
-                        customer_names.append(c["altName"].lower())
+                        customer_names.append(c["altName"])
                     if c.get("companyName"):
-                        customer_names.append(c["companyName"].lower())
-                customer_name = get_close_matches(row["Customer Name"].lower(), customer_names, n=2, cutoff=0.95)
+                        customer_names.append(c["companyName"])
+                customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
                 if customer_name:
                     customer_name = max(customer_name, key=customer_name.get)
                     customer_data = []
                     for c in ref_data["Customer"]:
                         if "name" in c.keys():
-                            if c["name"].lower() == customer_name:
+                            if c["name"] == customer_name:
                                 customer_data.append(c)
                         if "entityId" in c.keys():
-                            if c["entityId"].lower() == customer_name:
+                            if c["entityId"] == customer_name:
                                 customer_data.append(c)
                         if "altName" in c.keys():
-                            if c["altName"].lower() == customer_name:
+                            if c["altName"] == customer_name:
                                 customer_data.append(c)
                         if "companyName" in c.keys():
-                            if c["companyName"].lower() == customer_name:
+                            if c["companyName"] == customer_name:
                                 customer_data.append(c)
                     if customer_data:
                         customer_data = customer_data[0]

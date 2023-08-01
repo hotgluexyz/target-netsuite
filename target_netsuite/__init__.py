@@ -263,10 +263,10 @@ def build_lines(x, ref_data, config):
 
         # Get the NetSuite Location Ref
         customer_name = row.get("Customer Name")
-        customer_id = row.get("Customer ID")
+        customer_id = row.get("Customer Id")
         if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
             if customer_id: 
-                customer = list(filter(lambda x: x['entityId'] == customer_id, ref_data['Customer']))
+                customer = list(filter(lambda x: x['internalId'] == str(customer_id), ref_data['Customer']))
             
             if not customer_id or not customer:
                 customer_names = []
@@ -303,7 +303,7 @@ def build_lines(x, ref_data, config):
                             "internalId": customer_data.get("internalId"),
                         }
             else: 
-                journal_entry_line = { 
+                journal_entry_line['entity'] = { 
                     "externalId": customer[0].get("externalId"),
                     "internalId": customer[0].get("internalId")
                 }
@@ -430,8 +430,8 @@ def upload_journals(config, ns_client):
     journals = load_journal_entries(input_data, reference_data, config)
 
     # Post the journal entries to Netsuite
-    for journal in journals:
-        post_journal_entries(journal, ns_client)
+    # for journal in journals:
+    #     post_journal_entries(journal, ns_client)
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")

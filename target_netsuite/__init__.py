@@ -263,10 +263,11 @@ def build_lines(x, ref_data, config):
 
         # Get the NetSuite Location Ref
         customer_name = row.get("Customer Name")
-        customer_id = row.get("Customer Id")
+        customer_id = row.get("Customer Id") if row.get("Customer Id") else row.get("Customer ID")
+        
         if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
             if customer_id: 
-                customer = list(filter(lambda x: x['internalId'] == str(customer_id), ref_data['Customer']))
+                customer = list(filter(lambda x: x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id), ref_data['Customer']))
             
             if not customer_id or not customer:
                 customer_names = []

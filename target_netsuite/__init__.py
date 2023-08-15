@@ -87,7 +87,7 @@ def get_ns_client(config):
     logger.info(f"Successfully created netsuite connection..")
     return ns
 
-def get_reference_data(ns_client, input_data):
+def get_reference_data(config, ns_client, input_data):
     logger.info(f"Reading reference data from API...")
     reference_data = {}
 
@@ -112,9 +112,7 @@ def get_reference_data(ns_client, input_data):
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
 
-    if "Subsidiary" in input_data.columns:
-        if not input_data["Subsidiary"].dropna().empty:
-            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
+    reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
@@ -266,12 +264,20 @@ def build_lines(x, ref_data, config):
         customer_id = row.get("Customer Id") if row.get("Customer Id") else row.get("Customer ID")
         
         if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
-            if customer_id: 
+            # If customer has either customer name or id
+            if customer_id:
+                # Search for the customer based on the customer id
                 customer = list(filter(lambda x: x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id), ref_data['Customer']))
+
+                if len(customer) > 1 and customer_name:
+                    # If customer id is duplicated, search for the customer based on the customer name
+                    customer = list(filter(lambda x: x.get('companyName') == customer_name, customer))
             
             if not customer_id or not customer:
+                # If customer id is not provided or customer with ID is not found, search for the customer based on the customer name
                 customer_names = []
                 for c in ref_data["Customer"]:
+                    # Generates a list of customer data so we can check against
                     if c.get("name"):
                         customer_names.append(c["name"])
                     if c.get("entityId"):
@@ -280,7 +286,9 @@ def build_lines(x, ref_data, config):
                         customer_names.append(c["altName"])
                     if c.get("companyName"):
                         customer_names.append(c["companyName"])
+                
                 customer_name = get_close_matches(row["Customer Name"], customer_names, n=2, cutoff=0.95)
+                
                 if customer_name:
                     customer_name = max(customer_name, key=customer_name.get)
                     customer_data = []
@@ -375,7 +383,7 @@ def build_lines(x, ref_data, config):
 
 
 def load_journal_entries(input_data, reference_data, config):
-    # Build the entries
+    # Build the entries using build_lines function
     try:
         lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
     except RuntimeError as e:
@@ -387,10 +395,46 @@ def load_journal_entries(input_data, reference_data, config):
     return lines.values
 
 
-def post_journal_entries(journal, ns_client):
+def get_item_with_error_while_posting(reference_data, error_string):
+    error_beggining = "code: INVALID_KEY_OR_REF, message: An error occured in a upsert request: Invalid entity reference key "
+    if (not "INVALID_KEY_OR_REF" in error_string) and \
+        ("subsidiary " not in error_string) and \
+        ("An error occured in a upsert request: Invalid entity reference key" not in error_string):
+        return None
+
+    customer = {}
+    subsidiary = {}
+    subsidiary_str = error_string.split(" for subsidiary ")[1].replace(".", "")
+    customer_id = error_string.replace(error_beggining, "").split(" for subsidiary ")[0]
+    for item in reference_data["Customer"]:
+        if item["internalId"] == customer_id:
+            customer = item
+
+    for item in reference_data["Subsidiaries"]:
+        if item["internalId"] == subsidiary_str:
+            subsidiary = item
+    
+    if customer == {}:
+        raise Exception("Customer with id {} not found".format(customer_id))
+
+    if subsidiary == {}:
+        raise Exception("Subsidiary with id {} not found".format(subsidiary_str))
+
+    raise Exception(
+        f"""Subsidiary {subsidiary['name']} #{subsidiary['internalId']} is not valid for the customer: {customer['companyName']}.
+        (Original exception: {error_string})"""
+    )
+
+
+def post_journal_entries(journal, ns_client, reference_data):
         entity = "JournalEntry"
-        # logger.info(f"Posting data for entity {1}")
-        response = ns_client.entities[entity](ns_client.client).post(journal)
+        logger.info(f"Posting data for entity {entity} and journal {journal}")
+        try:
+            response = ns_client.entities[entity](ns_client.client).post(journal)
+        except Exception as e:
+            get_item_with_error_while_posting(reference_data, e.__str__())
+            logger.error(f"Posting data for entity {entity} failed: {e}")
+            
         return json.dumps({entity: response}, default=str, indent=2)
 
 
@@ -425,14 +469,14 @@ def upload_journals(config, ns_client):
     input_data = read_input_data(config)
     
     # Load reference data
-    reference_data = get_reference_data(ns_client, input_data)
+    reference_data = get_reference_data(config, ns_client, input_data)
 
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 
     # Post the journal entries to Netsuite
     for journal in journals:
-        post_journal_entries(journal, ns_client)
+        post_journal_entries(journal, ns_client, reference_data)
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")
@@ -446,6 +490,8 @@ def upload(config, args):
         logger.info("Found JournalEntries.csv, uploading...")
         upload_journals(config, ns_client)
         logger.info("JournalEntries.csv uploaded!")
+    else:
+        raise Exception("JournalEntries.csv file not found!")
 
     logger.info("Posting process has completed!")
 

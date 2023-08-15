@@ -267,7 +267,12 @@ def build_lines(x, ref_data, config):
         
         if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
             if customer_id: 
+                # Search for the customer based on the customer id
                 customer = list(filter(lambda x: x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id), ref_data['Customer']))
+
+                if len(customer) > 1 and customer_name:
+                    # If customer id is duplicated, search for the customer based on the customer name
+                    customer = list(filter(lambda x: x.get('companyName') == customer_name, customer))
             
             if not customer_id or not customer:
                 customer_names = []

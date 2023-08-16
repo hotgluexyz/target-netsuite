@@ -101,7 +101,14 @@ def get_reference_data(ns_client, input_data):
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "entityId", "companyName"])
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all([
+                "altName",
+                "name",
+                "entityId",
+                "companyName",
+                "subsidiary",
+                "isInactive"
+            ])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -274,7 +281,13 @@ def build_lines(x, ref_data, config):
         if ref_data.get("Customer") and not (pd.isna(customer_name) and pd.isna(customer_id)):
             if customer_id: 
                 # Search for the customer based on the customer id
-                customer = list(filter(lambda x: x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id), ref_data['Customer']))
+                # and removes inactive customers so the line is skipped
+                customer = list(
+                    filter(
+                        lambda x: (x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id)) and (x["isInactive"] == False),
+                        ref_data['Customer']
+                    )
+                )
 
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name
@@ -283,6 +296,8 @@ def build_lines(x, ref_data, config):
             if not customer_id or not customer:
                 customer_names = []
                 for c in ref_data["Customer"]:
+                    if c.get("isInactive"):
+                        continue
                     if c.get("name"):
                         customer_names.append(c["name"])
                     if c.get("entityId"):

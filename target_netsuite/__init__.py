@@ -143,6 +143,12 @@ def build_lines(x, ref_data, config):
             if not acct_data:
                 logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
                 continue
+            
+            if len(acct_data) > 1 and row.get("Account Name"):
+                acct_data = [a for a in acct_data if a["acctName"] == row["Account Name"]]
+                if len(acct_data) == 0:
+                    logger.warning("Account Name does not match Account Number")
+                    continue
 
         # Using Account Name if provided
         elif ref_data.get("Accounts") and row.get("Account Name") and not pd.isna(row.get("Account Name")):

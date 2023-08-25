@@ -458,7 +458,8 @@ def upload_journals(config, ns_client):
 
     # Post the journal entries to Netsuite
     for journal in journals:
-        post_journal_entries(journal, ns_client)
+        response = post_journal_entries(journal, ns_client)
+        logger.info(f"Posted journal: {response}")
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")

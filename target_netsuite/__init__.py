@@ -185,10 +185,11 @@ def build_lines(x, ref_data, config):
             subsidiary_noparent_names = [s["name"] for s in ref_data["Subsidiaries"] if s.get("parent") is None]
             subsidiary_names = subsidiary_parent_names + subsidiary_noparent_names
             subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
-            if not subsidiary_name: ## secondary check for Subsidiary names alone if no match
-                subsidiary_names = [s["name"] for s in ref_data['Subsidiaries']]
-                subsidiary_name = get_close_matches(row['Subsidiary'],subsidiary_names)
-            
+
+            ## secondary check for Subsidiary names alone if no match
+            subsidiary_names = [s["name"] for s in ref_data['Subsidiaries']]
+            subsidiary_name.update(get_close_matches(row['Subsidiary'],subsidiary_names))
+
             if subsidiary_name:
                 subsidiary_name = max(subsidiary_name, key=subsidiary_name.get)
                 subsidiary_data = [s for s in ref_data["Subsidiaries"] if (s.get("parent") and (s["parent"]["name"] + " : " + s["name"]) == subsidiary_name) or (s["name"]==subsidiary_name)]

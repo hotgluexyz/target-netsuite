@@ -101,7 +101,7 @@ def get_reference_data(ns_client, input_data):
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "entityId", "companyName"])
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(["altName", "name", "entityId", "companyName", "subsidiary"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -175,9 +175,20 @@ def build_lines(x, ref_data, config):
                 for s in ref_data["Subsidiaries"]
                 if s.get("parent") is not None
             ]
+            subsidiary_name = None
             subsidiary_noparent_names = [s["name"] for s in ref_data["Subsidiaries"] if s.get("parent") is None]
             subsidiary_names = subsidiary_parent_names + subsidiary_noparent_names
-            subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
+            subsidiary_names_filtered = [sub for sub in subsidiary_names if sub.startswith(row["Subsidiary"]) or sub.endswith(row["Subsidiary"])]
+            if len(subsidiary_names_filtered) == 1:
+                subsidiary_name = {subsidiary_names_filtered[0]: 1}
+            
+            if not subsidiary_name and len(subsidiary_names_filtered) > 1:
+                subsidiary_names = subsidiary_names_filtered
+                subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
+            
+            if not subsidiary_name:
+                subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
+            
             if not subsidiary_name: ## secondary check for Subsidiary names alone if no match
                 subsidiary_names = [s["name"] for s in ref_data['Subsidiaries']]
                 subsidiary_name = get_close_matches(row['Subsidiary'],subsidiary_names)

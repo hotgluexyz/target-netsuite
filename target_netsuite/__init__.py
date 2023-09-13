@@ -148,14 +148,19 @@ def build_lines(x, ref_data, config):
             acct_num = str(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
-                logger.warning(f"{acct_num} is not valid for this netsuite account, skipping line")
-                continue
+                raise ValueError(f"Account Number {row.get('Account Number')} is not found in this Netsuite account")
             
             if len(acct_data) > 1 and row.get("Account Name"):
-                acct_data = [a for a in acct_data if a["acctName"] == row["Account Name"]]
+                logging.info(f"Multiple accounts with account number {row.get('Account Number')}, using account name to resolve")
+                acct_name = str(row["Account Name"])
+                acct_name = get_close_matches(acct_name, [a["acctName"] for a in ref_data["Accounts"]])
+                acct_name = max(acct_name, key=acct_name.get)
+                acct_data = [a for a in ref_data["Accounts"] if a["acctName"] == acct_name]
                 if len(acct_data) == 0:
-                    logger.warning("Account Name does not match Account Number")
-                    continue
+                    possible_accts = [a["acctName"] for a in ref_data["Accounts"]]
+                    raise ValueError(
+                        f"Account Number {row.get('Account Number')} with Account Name {row.get('Account Name')} doesn't match options. Available options are: {possible_accts}"
+                    )
 
         # Using Account Name if provided
         elif ref_data.get("Accounts") and row.get("Account Name") and not pd.isna(row.get("Account Name")):

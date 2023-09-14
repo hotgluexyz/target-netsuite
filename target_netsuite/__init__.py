@@ -132,7 +132,7 @@ def get_reference_data(ns_client, input_data):
             reference_data["Items"] = ns_client.entities["Items"](ns_client.client).get_all(["itemId"])
         
     if not input_data["Account Number"].dropna().empty or not input_data["Account Name"].dropna().empty:
-        reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList"])
+        reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
 
     return reference_data
 
@@ -149,13 +149,20 @@ def build_lines(x, ref_data, config):
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
                 raise ValueError(f"Account Number {row.get('Account Number')} is not found in this Netsuite account")
-            
+                 
             if len(acct_data) > 1 and row.get("Account Name"):
                 logging.info(f"Multiple accounts with account number {row.get('Account Number')}, using account name to resolve")
                 acct_name = str(row["Account Name"])
-                acct_name = get_close_matches(acct_name, [a["acctName"] for a in ref_data["Accounts"]])
+                acct_parent_names = [
+                    s["parent"]["name"] + " : " + s["acctName"]
+                    for s in ref_data["Accounts"]
+                    if s.get("parent") is not None
+                ]
+                acct_noparent_names = [s["acctName"] for s in ref_data["Accounts"] if s.get("parent") is None]
+                acct_names = acct_parent_names + acct_noparent_names
+                acct_name = get_close_matches(acct_name, acct_names)
                 acct_name = max(acct_name, key=acct_name.get)
-                acct_data = [a for a in ref_data["Accounts"] if a["acctName"] == acct_name]
+                acct_data = [a for a in ref_data["Accounts"] if (a.get("parent") and (a["parent"]["name"] + " : " + a["acctName"]) == acct_name) or (a["acctName"]==acct_name)]
                 if len(acct_data) == 0:
                     possible_accts = [a["acctName"] for a in ref_data["Accounts"]]
                     raise ValueError(

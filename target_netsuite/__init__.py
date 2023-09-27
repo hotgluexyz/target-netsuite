@@ -136,6 +136,28 @@ def get_reference_data(ns_client, input_data):
 
     return reference_data
 
+def log_for_journal_entry(journal_entry, ref_data):
+    logger.info(f"Posting journal entry: {journal_entry}")
+    try:
+        logging.info(f"Subsidiary: {[s for s in ref_data['Subsidiaries'] if s['internalId'] == journal_entry['subsidiary']['internalId']]}")
+    except:
+        pass
+
+    try:
+        logging.info(f"Currency: {[s for s in ref_data['Currencies'] if s['internalId'] == journal_entry['currency']['internalId']]}")
+    except:
+        pass
+
+    try:
+        logger.info(f"Customer: {[s for s in ref_data['Customer'] if s['internalId'] == journal_entry['entity']['internalId']]}")
+    except:
+        pass
+
+    try:
+        accounts = [a['account']['internalId'] for a in journal_entry['lineList']]
+        logger.info(f"Accounts: {[a for a in ref_data['Accounts'] if a['internalId'] in accounts]}")
+    except:
+        pass
 
 def build_lines(x, ref_data, config):
 
@@ -409,7 +431,7 @@ def build_lines(x, ref_data, config):
     
     # Update the entry with subsidiaries
     journal_entry.update(subsidiaries)
-
+    log_for_journal_entry(journal_entry, ref_data)
     return journal_entry
 
 

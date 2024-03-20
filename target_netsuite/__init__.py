@@ -503,37 +503,8 @@ def upload_journals(config, ns_client):
     input_data = read_input_data(config)
     
     # Load reference data
-    # reference_data = get_reference_data(ns_client, input_data)
-
-    ##Reference data starts
-
-    # serializable_data = convert_to_serializable(reference_data)
-    # data_with_values = add_values(serializable_data)
-    # json_data = json.dumps(data_with_values, indent=4)
-    # with open("refrence_data.json", 'w') as file:
-    #     file.write(json_data)
-
-
-    # Load the JSON data from refrence_data.json
-    with open('reference_data.json', 'r') as file:
-        data = json.load(file)
-
-    #### Reference data ends
-    with open('reference_data.json', 'r') as file:
-        data = json.load(file)
-    for key in data.keys():    
-        for i, record in enumerate(data[key]):
-            if 'subsidiary' in record:
-                data[key][i]['subsidiary'] = record['subsidiary']['__values__']
-            if 'parent' in record:
-                if record['parent']:
-                    data[key][i]['parent'] = record['parent']['__values__']    
-        
-            
+    reference_data = get_reference_data(ns_client, input_data)
     
-    reference_data = data
-    ### Rererence data ends
-
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

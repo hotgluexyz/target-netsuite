@@ -438,7 +438,7 @@ def build_lines(x, ref_data, config):
 def load_journal_entries(input_data, reference_data, config):
     # Build the entries
     try:
-        lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
+        lines = input_data.groupby(["Journal Entry Id",'Subsidiary']).apply(build_lines, reference_data, config)
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 
@@ -480,13 +480,59 @@ def read_input_data(config):
     
     return input_data
 
+def convert_to_serializable(obj):
+    if isinstance(obj, dict):
+        return {k: convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_serializable(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        return convert_to_serializable(obj.__dict__)
+    else:
+        return obj
+
+def add_values(obj):
+    if isinstance(obj, dict):
+        return {k: {'__values__': v} if isinstance(v, dict) else v for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [add_values(item) for item in obj]
+    else:
+        return obj
 
 def upload_journals(config, ns_client):
     # Read input data
     input_data = read_input_data(config)
     
     # Load reference data
-    reference_data = get_reference_data(ns_client, input_data)
+    # reference_data = get_reference_data(ns_client, input_data)
+
+    ##Reference data starts
+
+    # serializable_data = convert_to_serializable(reference_data)
+    # data_with_values = add_values(serializable_data)
+    # json_data = json.dumps(data_with_values, indent=4)
+    # with open("refrence_data.json", 'w') as file:
+    #     file.write(json_data)
+
+
+    # Load the JSON data from refrence_data.json
+    with open('reference_data.json', 'r') as file:
+        data = json.load(file)
+
+    #### Reference data ends
+    with open('reference_data.json', 'r') as file:
+        data = json.load(file)
+    for key in data.keys():    
+        for i, record in enumerate(data[key]):
+            if 'subsidiary' in record:
+                data[key][i]['subsidiary'] = record['subsidiary']['__values__']
+            if 'parent' in record:
+                if record['parent']:
+                    data[key][i]['parent'] = record['parent']['__values__']    
+        
+            
+    
+    reference_data = data
+    ### Rererence data ends
 
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)

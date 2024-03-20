@@ -438,7 +438,7 @@ def build_lines(x, ref_data, config):
 def load_journal_entries(input_data, reference_data, config):
     # Build the entries
     try:
-        lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
+        lines = input_data.groupby(["Journal Entry Id",'Subsidiary']).apply(build_lines, reference_data, config)
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 
@@ -480,14 +480,12 @@ def read_input_data(config):
     
     return input_data
 
-
 def upload_journals(config, ns_client):
     # Read input data
     input_data = read_input_data(config)
     
     # Load reference data
     reference_data = get_reference_data(ns_client, input_data)
-
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

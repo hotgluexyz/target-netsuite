@@ -480,31 +480,12 @@ def read_input_data(config):
     
     return input_data
 
-def convert_to_serializable(obj):
-    if isinstance(obj, dict):
-        return {k: convert_to_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_to_serializable(item) for item in obj]
-    elif hasattr(obj, '__dict__'):
-        return convert_to_serializable(obj.__dict__)
-    else:
-        return obj
-
-def add_values(obj):
-    if isinstance(obj, dict):
-        return {k: {'__values__': v} if isinstance(v, dict) else v for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [add_values(item) for item in obj]
-    else:
-        return obj
-
 def upload_journals(config, ns_client):
     # Read input data
     input_data = read_input_data(config)
     
     # Load reference data
     reference_data = get_reference_data(ns_client, input_data)
-    
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

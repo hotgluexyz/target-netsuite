@@ -379,6 +379,15 @@ def build_lines(x, ref_data, config):
             else:
               journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": external_id, "value": row['SKU']}]
 
+        # Support dynamic custom fields
+        custom_fields = config.get("custom_fields") or []
+
+        for entry in custom_fields:
+            value = row.get(entry.get("input_id"))
+            ns_id = entry.get("netsuite_id")
+            if value:
+                journal_entry_line["customFieldList"] = [{"type": "Select", "scriptId": ns_id, "value": value}]
+
         # Check the Posting Type and insert the Amount
         amount = 0 if pd.isna(row["Amount"]) else abs(round(row["Amount"], 2))
         if row["Posting Type"].lower() == "credit":

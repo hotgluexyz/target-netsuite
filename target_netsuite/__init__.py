@@ -100,6 +100,8 @@ def get_reference_data(ns_client, input_data):
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
+        if "Customer Name" in input_data.columns:
+            input_data["Customer Name"] = input_data["Customer Name"].replace("\\N", pd.NA)
         if not input_data["Customer Name"].dropna().empty:
             reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all([
                 "altName",

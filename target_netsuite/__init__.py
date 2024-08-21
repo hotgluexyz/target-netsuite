@@ -377,9 +377,9 @@ def build_lines(x, ref_data, config):
             if config.get("sku_item_lookup", False):
               item_id = next((i["internalId"] for i in ref_data["Items"] if (i["externalId"]==row["SKU"] or i['itemId'] == row["SKU"])), None)
               if item_id:
-                   custom_field_values.append([{"type": "Select", "scriptId": external_id, "value": item_id}])
+                   custom_field_values.append({"type": "Select", "scriptId": external_id, "value": item_id})
             else:
-              custom_field_values.append([{"type": "Select", "scriptId": external_id, "value": row['SKU']}])
+              custom_field_values.append({"type": "Select", "scriptId": external_id, "value": row['SKU']})
 
         # Support dynamic custom fields
         custom_fields = config.get("custom_fields") or []
@@ -388,7 +388,7 @@ def build_lines(x, ref_data, config):
             value = row.get(entry.get("input_id"))
             ns_id = entry.get("netsuite_id")
             if value:
-                custom_field_values.append([{"type": "Select", "scriptId": ns_id, "value": value}])
+                custom_field_values.append({"type": "Select", "scriptId": ns_id, "value": value})
 
         if custom_field_values:
             journal_entry_line["customFieldList"] = custom_field_values

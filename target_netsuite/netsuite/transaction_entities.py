@@ -179,5 +179,9 @@ class JournalEntries(ApiBase):
 
         logger.info(
             f"Posting JournalEntries now with {len(je['lineList']['line'])} entries. ExternalId {je['externalId']} tranDate {je['tranDate']}")
-        res = self.ns_client.upsert(je)
+        try:
+            res = self.ns_client.upsert(je)
+        except Exception as e:
+            logger.error(f"Error posting journal entry: {je}")
+            raise e
         return self._serialize(res)

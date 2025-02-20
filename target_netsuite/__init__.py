@@ -66,7 +66,7 @@ def parse_args():
 
 
 def get_ns_client(config):
-    ns_account = config.get("ns_account")
+    ns_account = config.get("ns_account").upper()
     ns_consumer_key = config.get("ns_consumer_key")
     ns_consumer_secret = config.get("ns_consumer_secret")
     ns_token_key = config.get("ns_token_key")

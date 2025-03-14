@@ -7,6 +7,7 @@ from netsuitesdk.api.base import ApiBase
 from zeep.exceptions import Fault
 
 import singer
+import re
 
 logger = singer.get_logger()
 
@@ -183,5 +184,13 @@ class JournalEntries(ApiBase):
             res = self.ns_client.upsert(je)
         except Exception as e:
             logger.error(f"Error posting journal entry: {je}")
-            raise e
+
+            match = re.search(r"Invalid entity reference key (\d+) for subsidiary (\d+)", e.__str__())
+            if match:
+                entity_id = match.group(1)
+                subsidiary_id = match.group(2)
+                error_message = f"Customer '{entity_id}' can not be used with subsidiary '{subsidiary_id}'"
+                raise Exception(error_message)
+            raise e 
+        
         return self._serialize(res)

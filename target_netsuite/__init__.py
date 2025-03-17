@@ -140,23 +140,40 @@ def get_reference_data(ns_client, input_data):
 def log_for_journal_entry(journal_entry, ref_data):
     logger.info(f"Posting journal entry: {journal_entry}")
     try:
-        logging.info(f"Subsidiary: {[s for s in ref_data['Subsidiaries'] if s['internalId'] == journal_entry['subsidiary']['internalId']]}")
+        subsidiaries = json.dumps(
+            [s for s in ref_data['Subsidiaries'] if s['internalId'] == journal_entry['subsidiary']['internalId']],
+            separators=(",", ":")  # Removes extra spaces for a compact one-liner
+        )
+        
+        logging.info(f"Subsidiary: {subsidiaries}")
     except:
         pass
 
     try:
-        logging.info(f"Currency: {[s for s in ref_data['Currencies'] if s['internalId'] == journal_entry['currency']['internalId']]}")
+        currencies = json.dumps(
+            [s for s in ref_data['Currencies'] if s['internalId'] == journal_entry['currency']['internalId']],
+            separators=(",", ":")  # Removes extra spaces for a compact one-liner
+        )
+        logging.info(f"Currency: {currencies}")
     except:
         pass
 
     try:
-        logger.info(f"Customer: {[s for s in ref_data['Customer'] if s['internalId'] == journal_entry['entity']['internalId']]}")
+        customers = json.dumps(
+            [s for s in ref_data['Customer'] if s['internalId'] == journal_entry['entity']['internalId']],
+            separators=(",", ":")  # Removes extra spaces for a compact one-liner
+        )
+        logger.info(f"Customer: {customers}")
     except:
         pass
 
     try:
         accounts = [a['account']['internalId'] for a in journal_entry['lineList']]
-        logger.info(f"Accounts: {[a for a in ref_data['Accounts'] if a['internalId'] in accounts]}")
+        accounts = json.dumps(
+            [a for a in ref_data['Accounts'] if a['internalId'] in accounts],
+            separators=(",", ":")  # Removes extra spaces for a compact one-liner
+        )
+        logger.info(f"Accounts: {accounts}")
     except:
         pass
 
@@ -325,6 +342,7 @@ def build_lines(x, ref_data, config):
                         ref_data['Customer']
                     )
                 )
+                logger.info(f"Customers found for id '{customer_id}': {json.dumps(customer)}")
                 customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
 
                 if len(customer) > 1 and customer_name:
@@ -367,6 +385,8 @@ def build_lines(x, ref_data, config):
                                 customer_data.append(c)
                     if not customer_data:
                         raise Exception(f"Customer {customer_name} was not found")
+
+                    logger.info(f"Customers found for customer name '{customer_name}': {json.dumps(customer)}")
                     customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
                     if customer_data:
                         customer_data = customer_data[0]
@@ -492,7 +512,7 @@ def post_journal_entries(journal, ns_client, ref_data):
                 entity_name = entity[0]["companyName"] if entity else ""
                 subsidiary = [s for s in ref_data["Subsidiaries"] if s["internalId"] == subsidiary_id]
                 subsidiary_name = subsidiary[0]["name"] if entity else ""
-                error_message = f"Customer '{entity_name}' with id '{entity_id}' can not be used with subsidiary '{subsidiary_name}' with id '{subsidiary_id}'"
+                error_message = f"Customer '{entity_name}' with id '{entity_id}' cannot be used with subsidiary '{subsidiary_name}' with id '{subsidiary_id}'"
                 raise Exception(error_message)
         return json.dumps({entity: response}, default=str, indent=2)
 
@@ -535,7 +555,7 @@ def upload_journals(config, ns_client):
     for journal in journals:
         logger.info(f"Posting journal: {journal}")
         response = post_journal_entries(journal, ns_client, reference_data)
-        logger.info(f"Posted journal: {response}")
+        logger.info(f"Posted journal: {json.dumps(response, default=str)}")
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")

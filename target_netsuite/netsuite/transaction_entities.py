@@ -183,7 +183,8 @@ class JournalEntries(ApiBase):
         try:
             res = self.ns_client.upsert(je)
         except Exception as e:
-            logger.error(f"Error posting journal entry: {je}")
+            je_log = re.sub(r"\s+", " ",je.__str__()).replace("\n", "")
+            logger.error(f"Error posting journal entry: {je_log}")
             raise e 
         
         return self._serialize(res)

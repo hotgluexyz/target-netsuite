@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import sys
+import re
 
 import pandas as pd
 from difflib import SequenceMatcher
@@ -163,6 +164,7 @@ def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
+    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x.name[1]][0]
     # Create line items
     for _, row in x.iterrows():
         #  Using Account Number if provided 
@@ -323,6 +325,7 @@ def build_lines(x, ref_data, config):
                         ref_data['Customer']
                     )
                 )
+                customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
 
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name
@@ -362,12 +365,17 @@ def build_lines(x, ref_data, config):
                         if "companyName" in c.keys():
                             if c["companyName"] == customer_name:
                                 customer_data.append(c)
+                    if not customer_data:
+                        raise Exception(f"Customer {customer_name} was not found")
+                    customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
                     if customer_data:
                         customer_data = customer_data[0]
                         journal_entry_line["entity"] = {
                             "externalId": customer_data.get("externalId"),
                             "internalId": customer_data.get("internalId"),
                         }
+                    else:
+                        raise Exception(f"Customer with name {customer_name} or id {customer_id} doesn't belong to journal subsidiary {journal_subsidiary['internalId']} with id {journal_subsidiary['name']}")
             else: 
                 journal_entry_line['entity'] = { 
                     "externalId": customer[0].get("externalId"),
@@ -470,10 +478,22 @@ def load_journal_entries(input_data, reference_data, config):
     return lines.values
 
 
-def post_journal_entries(journal, ns_client):
+def post_journal_entries(journal, ns_client, ref_data):
         entity = "JournalEntry"
         # logger.info(f"Posting data for entity {1}")
-        response = ns_client.entities[entity](ns_client.client).post(journal)
+        try:
+            response = ns_client.entities[entity](ns_client.client).post(journal)
+        except Exception as e:
+            match = re.search(r"Invalid entity reference key (\d+) for subsidiary (\d+)", e.__str__())
+            if match:
+                entity_id = match.group(1)
+                subsidiary_id = match.group(2)
+                entity = [c for c in ref_data["Customer"] if c["internalId"] == entity_id]
+                entity_name = entity[0]["companyName"] if entity else ""
+                subsidiary = [s for s in ref_data["Subsidiaries"] if s["internalId"] == subsidiary_id]
+                subsidiary_name = subsidiary[0]["name"] if entity else ""
+                error_message = f"Customer '{entity_name}' with id '{entity_id}' can not be used with subsidiary '{subsidiary_name}' with id '{subsidiary_id}'"
+                raise Exception(error_message)
         return json.dumps({entity: response}, default=str, indent=2)
 
 
@@ -514,7 +534,7 @@ def upload_journals(config, ns_client):
     # Post the journal entries to Netsuite
     for journal in journals:
         logger.info(f"Posting journal: {journal}")
-        response = post_journal_entries(journal, ns_client)
+        response = post_journal_entries(journal, ns_client, reference_data)
         logger.info(f"Posted journal: {response}")
 
     logger.info(f"Posted journal entries: ")

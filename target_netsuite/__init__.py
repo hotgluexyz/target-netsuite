@@ -11,6 +11,7 @@ from difflib import SequenceMatcher
 from heapq import nlargest as _nlargest
 
 from target_netsuite.netsuite import NetSuite
+from target_netsuite.netsuite.utils import clean_logs
 
 from netsuitesdk.internal.exceptions import NetSuiteRequestError
 
@@ -140,9 +141,8 @@ def get_reference_data(ns_client, input_data):
 def log_for_journal_entry(journal_entry, ref_data):
     logger.info(f"Posting journal entry: {journal_entry}")
     try:
-        subsidiaries = json.dumps(
+        subsidiaries = clean_logs(
             [s for s in ref_data['Subsidiaries'] if s['internalId'] == journal_entry['subsidiary']['internalId']],
-            separators=(",", ":")  # Removes extra spaces for a compact one-liner
         )
         
         logging.info(f"Subsidiary: {subsidiaries}")
@@ -150,18 +150,16 @@ def log_for_journal_entry(journal_entry, ref_data):
         pass
 
     try:
-        currencies = json.dumps(
+        currencies = clean_logs(
             [s for s in ref_data['Currencies'] if s['internalId'] == journal_entry['currency']['internalId']],
-            separators=(",", ":")  # Removes extra spaces for a compact one-liner
         )
         logging.info(f"Currency: {currencies}")
     except:
         pass
 
     try:
-        customers = json.dumps(
+        customers = clean_logs(
             [s for s in ref_data['Customer'] if s['internalId'] == journal_entry['entity']['internalId']],
-            separators=(",", ":")  # Removes extra spaces for a compact one-liner
         )
         logger.info(f"Customer: {customers}")
     except:
@@ -169,9 +167,8 @@ def log_for_journal_entry(journal_entry, ref_data):
 
     try:
         accounts = [a['account']['internalId'] for a in journal_entry['lineList']]
-        accounts = json.dumps(
+        accounts = clean_logs(
             [a for a in ref_data['Accounts'] if a['internalId'] in accounts],
-            separators=(",", ":")  # Removes extra spaces for a compact one-liner
         )
         logger.info(f"Accounts: {accounts}")
     except:
@@ -342,7 +339,8 @@ def build_lines(x, ref_data, config):
                         ref_data['Customer']
                     )
                 )
-                logger.info(f"Customers found for id '{customer_id}': {json.dumps(customer)}")
+                customer_log = clean_logs(customer)
+                logger.info(f"Customers found for id '{customer_id}': {customer_log}")
                 customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
 
                 if len(customer) > 1 and customer_name:
@@ -386,7 +384,8 @@ def build_lines(x, ref_data, config):
                     if not customer_data:
                         raise Exception(f"Customer {customer_name} was not found")
 
-                    logger.info(f"Customers found for customer name '{customer_name}': {json.dumps(customer)}")
+                    customer_data_log = clean_logs(customer_data)
+                    logger.info(f"Customers found for customer name '{customer_name}': {customer_data_log}")
                     customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
                     if customer_data:
                         customer_data = customer_data[0]

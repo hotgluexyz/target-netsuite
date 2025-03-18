@@ -7,7 +7,7 @@ from netsuitesdk.api.base import ApiBase
 from zeep.exceptions import Fault
 
 import singer
-import re
+from netsuite.utils import clean_logs
 
 logger = singer.get_logger()
 
@@ -183,7 +183,8 @@ class JournalEntries(ApiBase):
         try:
             res = self.ns_client.upsert(je)
         except Exception as e:
-            logger.error(f"Error posting journal entry: {je}")
+            je_log = clean_logs(je)
+            logger.error(f"Error posting journal entry: {je_log}")
             raise e 
         
         return self._serialize(res)

@@ -7,7 +7,7 @@ from netsuitesdk.api.base import ApiBase
 from zeep.exceptions import Fault
 
 import singer
-from netsuite.utils import clean_logs
+from target_netsuite.netsuite.utils import clean_logs
 
 logger = singer.get_logger()
 

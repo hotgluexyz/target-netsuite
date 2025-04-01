@@ -178,7 +178,7 @@ def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
-    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x.name[1]][0]
+    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x.name[1]][0] if ref_data.get("Subsidiaries") else None
     # Create line items
     for _, row in x.iterrows():
         #  Using Account Number if provided 
@@ -341,7 +341,8 @@ def build_lines(x, ref_data, config):
                 )
                 customer_log = clean_logs(customer)
                 logger.info(f"Customers found for id '{customer_id}': {customer_log}")
-                customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
+                if journal_subsidiary:
+                    customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
 
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name
@@ -386,7 +387,8 @@ def build_lines(x, ref_data, config):
 
                     customer_data_log = clean_logs(customer_data)
                     logger.info(f"Customers found for customer name '{customer_name}': {customer_data_log}")
-                    customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
+                    if journal_subsidiary:
+                        customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
                     if customer_data:
                         customer_data = customer_data[0]
                         journal_entry_line["entity"] = {

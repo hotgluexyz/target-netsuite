@@ -178,7 +178,12 @@ def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
-    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x.name[1]][0] if ref_data.get("Subsidiaries") else None
+    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x["Subsidiary"].iloc[0]] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
+    if journal_subsidiary:
+        journal_subsidiary = journal_subsidiary[0]
+    elif not journal_subsidiary and not x.empty and "Subsidiary" in x and x["Subsidiary"].iloc[0]:
+        raise Exception(f"Journal Subsidiary '{x['Subsidiary'].iloc[0]}' is not a valid subsidiary.")
+
     # Create line items
     for _, row in x.iterrows():
         #  Using Account Number if provided 

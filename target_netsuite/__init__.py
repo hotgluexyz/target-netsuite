@@ -180,8 +180,10 @@ def build_lines(x, ref_data, config):
     subsidiaries = {}
     journal_subsidiary = x["Subsidiary"].iloc[0] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
     if journal_subsidiary:
-        if journal_subsidiary[0].isdigit():
-            journal_subsidiary = {"internalId": journal_subsidiary[0]}
+        if isinstance(journal_subsidiary, str) and journal_subsidiary.isdigit():
+            journal_subsidiary = {"internalId": journal_subsidiary}
+        elif isinstance(journal_subsidiary, int) or isinstance(journal_subsidiary, float):
+            journal_subsidiary = {"internalId": str(int(journal_subsidiary))}
         else:
             journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == journal_subsidiary]
             if not journal_subsidiary:
@@ -237,12 +239,19 @@ def build_lines(x, ref_data, config):
 
         subsidiary = None
         if not pd.isna(row.get("Subsidiary")):
+            row_subsidiary = row["Subsidiary"]
             # if subsidiary is a digit use it as internalId
-            if row["Subsidiary"].isdigit():
+            if isinstance(row_subsidiary, str) and row_subsidiary.isdigit():
                 subsidiary = {
                     "name": None,
                     "externalId": None,
-                    "internalId": row["Subsidiary"],
+                    "internalId": row_subsidiary
+                }
+            elif isinstance(row_subsidiary, int) or isinstance(row_subsidiary, float):
+                subsidiary = {
+                    "name": None,
+                    "externalId": None,
+                    "internalId": str(int(row_subsidiary))
                 }
             # lookup subsidiary by name
             else:

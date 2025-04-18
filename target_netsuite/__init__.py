@@ -449,6 +449,8 @@ def build_lines(x, ref_data, config):
         currency_data = [
             c for c in ref_data["Currencies"] if c["symbol"] == row["Currency"]
             ]
+        if not currency_data:
+            raise Exception(f"Currency '{row['Currency']}' not found")
         if currency_data:
             currency_data = currency_data[0]
             currency_ref = {
@@ -545,7 +547,8 @@ def read_input_data(config):
             f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
         )
         sys.exit(1)
-    
+    # replace nan with None
+    input_data = input_data.where(pd.notnull(input_data), None)
     return input_data
 
 def upload_journals(config, ns_client):

@@ -178,11 +178,16 @@ def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
-    journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == x["Subsidiary"].iloc[0]] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
+    journal_subsidiary = x["Subsidiary"].iloc[0] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
     if journal_subsidiary:
-        journal_subsidiary = journal_subsidiary[0]
-    elif not journal_subsidiary and not x.empty and "Subsidiary" in x and x["Subsidiary"].iloc[0]:
-        raise Exception(f"Journal Subsidiary '{x['Subsidiary'].iloc[0]}' is not a valid subsidiary.")
+        if journal_subsidiary[0].isdigit():
+            journal_subsidiary = {"internalId": journal_subsidiary[0]}
+        else:
+            journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == journal_subsidiary]
+            if not journal_subsidiary:
+                raise Exception(f"Journal Subsidiary '{x['Subsidiary'].iloc[0]}' is not a valid subsidiary.")
+            journal_subsidiary = journal_subsidiary[0]
+
 
     # Create line items
     for _, row in x.iterrows():
@@ -230,35 +235,41 @@ def build_lines(x, ref_data, config):
         }
         journal_entry_line = {"account": ref_acct}
 
-        # Get subsidiary
+        subsidiary = None
         if not pd.isna(row.get("Subsidiary")):
-            subsidiary_parent_names = [
-                s["parent"]["name"] + " : " + s["name"]
-                for s in ref_data["Subsidiaries"]
-                if s.get("parent") is not None
-            ]
-            subsidiary_noparent_names = [s["name"] for s in ref_data["Subsidiaries"] if s.get("parent") is None]
-            subsidiary_names = subsidiary_parent_names + subsidiary_noparent_names
-            subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
-
-            ## secondary check for Subsidiary names alone if no match
-            subsidiary_names = [s["name"] for s in ref_data['Subsidiaries']]
-            subsidiary_name.update(get_close_matches(row['Subsidiary'],subsidiary_names))
-
-            if subsidiary_name:
-                subsidiary_name = max(subsidiary_name, key=subsidiary_name.get)
-                subsidiary_data = [s for s in ref_data["Subsidiaries"] if (s.get("parent") and (s["parent"]["name"] + " : " + s["name"]) == subsidiary_name) or (s["name"]==subsidiary_name)]
-                if subsidiary_data:
-                    subsidiary_data = subsidiary_data[0]
-                    subsidiary = {
-                        "name": None,
-                        "externalId": None,
-                        "internalId": subsidiary_data.get("internalId"),
-                    }
-                else:
-                    subsidiary = None
+            # if subsidiary is a digit use it as internalId
+            if row["Subsidiary"].isdigit():
+                subsidiary = {
+                    "name": None,
+                    "externalId": None,
+                    "internalId": row["Subsidiary"],
+                }
+            # lookup subsidiary by name
             else:
-                subsidiary = None
+                subsidiary_parent_names = [
+                    s["parent"]["name"] + " : " + s["name"]
+                    for s in ref_data["Subsidiaries"]
+                    if s.get("parent") is not None
+                ]
+                subsidiary_noparent_names = [s["name"] for s in ref_data["Subsidiaries"] if s.get("parent") is None]
+                subsidiary_names = subsidiary_parent_names + subsidiary_noparent_names
+                subsidiary_name = get_close_matches(row["Subsidiary"], subsidiary_names)
+
+                ## secondary check for Subsidiary names alone if no match
+                subsidiary_names = [s["name"] for s in ref_data['Subsidiaries']]
+                subsidiary_name.update(get_close_matches(row['Subsidiary'],subsidiary_names))
+
+                if subsidiary_name:
+                    subsidiary_name = max(subsidiary_name, key=subsidiary_name.get)
+                    subsidiary_data = [s for s in ref_data["Subsidiaries"] if (s.get("parent") and (s["parent"]["name"] + " : " + s["name"]) == subsidiary_name) or (s["name"]==subsidiary_name)]
+                # pass subsidiary data to subsidiary
+                    if subsidiary_data:
+                        subsidiary_data = subsidiary_data[0]
+                        subsidiary = {
+                            "name": None,
+                            "externalId": None,
+                            "internalId": subsidiary_data.get("internalId"),
+                        }
         # Extract the subsidiaries from Account
         else:
             if acct_data['subsidiaryList']:

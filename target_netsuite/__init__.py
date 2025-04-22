@@ -542,6 +542,7 @@ def post_journal_entries(journal, ns_client, ref_data):
                 subsidiary_name = subsidiary[0]["name"] if entity else ""
                 error_message = f"Customer '{entity_name}' with id '{entity_id}' cannot be used with subsidiary '{subsidiary_name}' with id '{subsidiary_id}'"
                 raise Exception(error_message)
+            raise e
         return json.dumps({entity: response}, default=str, indent=2)
 
 

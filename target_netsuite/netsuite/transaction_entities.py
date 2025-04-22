@@ -153,7 +153,7 @@ class JournalEntries(ApiBase):
 
         je['lineList'] = self.ns_client.JournalEntryLineList(line=line_list)
         
-        if je['currency'] is not None:
+        if data['currency'] is not None:
             je['currency'] = self.ns_client.RecordRef(**(data['currency']))
 
         if 'customFieldList' in data:

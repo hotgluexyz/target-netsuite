@@ -531,7 +531,6 @@ def post_journal_entries(journal, ns_client, ref_data):
         # logger.info(f"Posting data for entity {1}")
         try:
             response = ns_client.entities[entity](ns_client.client).post(journal)
-            return json.dumps({entity: response}, default=str, indent=2)
         except Exception as e:
             match = re.search(r"Invalid entity reference key (\d+) for subsidiary (\d+)", e.__str__())
             if match:
@@ -544,6 +543,7 @@ def post_journal_entries(journal, ns_client, ref_data):
                 error_message = f"Customer '{entity_name}' with id '{entity_id}' cannot be used with subsidiary '{subsidiary_name}' with id '{subsidiary_id}'"
                 raise Exception(error_message)
             raise e
+        return json.dumps({entity: response}, default=str, indent=2)
 
 
 def read_input_data(config):

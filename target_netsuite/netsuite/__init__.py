@@ -102,7 +102,8 @@ class NetSuite:
 
         if ns_account is not None:
             if is_sandbox is True:
-                self.ns_account = self.ns_account + '_SB1'
+                if "_sb" not in self.ns_account.lower():
+                    self.ns_account = self.ns_account + '_SB1'
 
         self.ns_client = None
 

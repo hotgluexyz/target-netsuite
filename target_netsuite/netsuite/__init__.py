@@ -100,10 +100,8 @@ class NetSuite:
 
         self.default_start_date = default_start_date
 
-        if ns_account is not None:
-            if is_sandbox is True:
-                if "_sb" not in self.ns_account.lower():
-                    self.ns_account = self.ns_account + '_SB1'
+        if ns_account is not None and "_sb" not in ns_account.lower() and is_sandbox:
+            self.ns_account = self.ns_account + '_SB1'
 
         self.ns_client = None
 

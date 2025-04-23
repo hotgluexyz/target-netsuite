@@ -7,6 +7,7 @@ import sys
 import re
 
 import pandas as pd
+import numpy as np
 from difflib import SequenceMatcher
 from heapq import nlargest as _nlargest
 
@@ -182,7 +183,7 @@ def build_lines(x, ref_data, config):
     if journal_subsidiary:
         if isinstance(journal_subsidiary, str) and journal_subsidiary.isdigit():
             journal_subsidiary = {"internalId": journal_subsidiary}
-        elif isinstance(journal_subsidiary, int) or isinstance(journal_subsidiary, float):
+        elif isinstance(journal_subsidiary, int) or isinstance(journal_subsidiary, float) or isinstance(journal_subsidiary, np.int64):
             journal_subsidiary = {"internalId": str(int(journal_subsidiary))}
         else:
             journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == journal_subsidiary]

@@ -7,6 +7,7 @@ import sys
 import re
 
 import pandas as pd
+import numpy as np
 from difflib import SequenceMatcher
 from heapq import nlargest as _nlargest
 

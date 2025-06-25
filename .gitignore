@@ -24,3 +24,5 @@ tap_mixpanel/.vscode/settings.json
 *.ipynb
 .DS_Store
 tap_target_commands.sh
+.venv
+

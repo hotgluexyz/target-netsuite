@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 from heapq import nlargest as _nlargest
 
 from target_netsuite.netsuite import NetSuite
-from target_netsuite.netsuite.utils import clean_logs
+from target_netsuite.netsuite.utils import clean_logs, stringify_number
 
 from netsuitesdk.internal.exceptions import NetSuiteRequestError
 
@@ -183,7 +183,7 @@ def build_lines(x, ref_data, config):
         if isinstance(journal_subsidiary, str) and journal_subsidiary.isdigit():
             journal_subsidiary = {"internalId": journal_subsidiary}
         elif isinstance(journal_subsidiary, int) or isinstance(journal_subsidiary, float):
-            journal_subsidiary = {"internalId": str(int(journal_subsidiary))}
+            journal_subsidiary = {"internalId": stringify_number(journal_subsidiary)}
         else:
             journal_subsidiary = [s for s in ref_data["Subsidiaries"] if s["name"] == journal_subsidiary]
             if not journal_subsidiary:
@@ -195,7 +195,7 @@ def build_lines(x, ref_data, config):
     for _, row in x.iterrows():
         #  Using Account Number if provided 
         if ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
-            acct_num = str(row["Account Number"])
+            acct_num = stringify_number(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
                 raise ValueError(f"Account Number {row.get('Account Number')} is not found in this Netsuite account")
@@ -251,7 +251,7 @@ def build_lines(x, ref_data, config):
                 subsidiary = {
                     "name": None,
                     "externalId": None,
-                    "internalId": str(int(row_subsidiary))
+                    "internalId": stringify_number(row_subsidiary)
                 }
             # lookup subsidiary by name
             else:
@@ -360,7 +360,7 @@ def build_lines(x, ref_data, config):
                 # and removes inactive customers so the line is skipped
                 customer = list(
                     filter(
-                        lambda x: (x['internalId'] == str(customer_id) or x['entityId'] == str(customer_id)) and (x["isInactive"] == False),
+                        lambda x: (x['internalId'] == stringify_number(customer_id) or x['entityId'] == stringify_number(customer_id)) and (x["isInactive"] == False),
                         ref_data['Customer']
                     )
                 )

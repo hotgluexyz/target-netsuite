@@ -513,11 +513,8 @@ def build_lines(x, ref_data, config):
 def load_journal_entries(input_data, reference_data, config):
     # Build the entries
     try:
-        if "Journal Entry Id" in input_data.columns and "Subsidiary" in input_data.columns:
-            lines = input_data.groupby(["Journal Entry Id",'Subsidiary']).apply(build_lines, reference_data, config)
-        else:
-            # Assuming Journal Entry Id will always be present
-            lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
+        # Assuming Journal Entry Id will always be present
+        lines = input_data.groupby(["Journal Entry Id",'Subsidiary'], dropna=False).apply(build_lines, reference_data, config)
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 

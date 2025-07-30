@@ -1,6 +1,9 @@
 # target-netsuite
 
-[NetSuite](https://www.netsuite.com/) target that inserts JournalEntries from a CSV file into the Netsuite API.
+**target-netsuite** is a target that inserts JournalEntries from a CSV file into the Netsuite API.
+**target-netsuite** can be run on [hotglue](https://hotglue.com), an embedded integration platform for ETL jobs.
+
+
 
 ```bash
 $ python3 -m venv env/target-netsuite

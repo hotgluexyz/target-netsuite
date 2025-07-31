@@ -194,8 +194,15 @@ def build_lines(x, ref_data, config):
 
     # Create line items
     for _, row in x.iterrows():
+        # Using Account ID if provided (highest priority)
+        if ref_data.get("Accounts") and row.get("Account ID") and not pd.isna(row.get("Account ID")):
+            acct_id = stringify_number(row["Account ID"])
+            acct_data = [a for a in ref_data["Accounts"] if a["internalId"] == acct_id]
+            if not acct_data:
+                raise ValueError(f"Account ID {row.get('Account ID')} is not found in this Netsuite account")
+
         #  Using Account Number if provided 
-        if ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
+        elif ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
             acct_num = stringify_number(row["Account Number"])
             acct_data = [a for a in ref_data["Accounts"] if a["acctNumber"] == acct_num]
             if not acct_data:
@@ -228,7 +235,7 @@ def build_lines(x, ref_data, config):
                 logger.warning(f"{acct_name} is not valid for this netsuite account, skipping line")
                 continue
         else: 
-            raise TypeError(f"Account Number or Account Name is required")
+            raise TypeError(f"Account ID, Account Number, or Account Name is required")
 
         acct_data = acct_data[0]
         ref_acct = {
@@ -558,15 +565,24 @@ def read_input_data(config):
         "Journal Entry Id",
         "Customer Name",
         "Class",
-        "Account Number",
-        "Account Name",
         "Posting Type",
         "Description",
     ]
+    
+    # At least one account identifier column is required
+    ACCOUNT_COLS = ["Account ID", "Account Number", "Account Name"]
+    
     # Verify it has required columns
     if not all(col in cols for col in REQUIRED_COLS):
         logger.error(
             f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
+        )
+        sys.exit(1)
+    
+    # Verify at least one account identifier column is present
+    if not any(col in cols for col in ACCOUNT_COLS):
+        logger.error(
+            f"CSV must contain at least one account identifier column. Found={json.dumps(cols)}, Account options={json.dumps(ACCOUNT_COLS)}"
         )
         sys.exit(1)
     # replace nan with None

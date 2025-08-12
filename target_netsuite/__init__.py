@@ -133,8 +133,11 @@ def get_reference_data(ns_client, input_data):
     if "SKU" in input_data.columns:
         if not input_data["SKU"].dropna().empty:
             reference_data["Items"] = ns_client.entities["Items"](ns_client.client).get_all(["itemId"])
-        
-    if not input_data["Account Number"].dropna().empty or not input_data["Account Name"].dropna().empty:
+
+    if (
+        ("Account Number" in input_data.columns and not input_data["Account Number"].dropna().empty) or
+        ("Account Name" in input_data.columns and not input_data["Account Name"].dropna().empty)
+    ):
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
 
     return reference_data
@@ -194,12 +197,12 @@ def build_lines(x, ref_data, config):
 
     # Create line items
     for _, row in x.iterrows():
-        # Using Account ID if provided (highest priority)
-        if ref_data.get("Accounts") and row.get("Account ID") and not pd.isna(row.get("Account ID")):
-            acct_id = stringify_number(row["Account ID"])
+        # Using Account Id if provided (highest priority)
+        if ref_data.get("Accounts") and row.get("Account Id") and not pd.isna(row.get("Account Id")):
+            acct_id = stringify_number(row["Account Id"])
             acct_data = [a for a in ref_data["Accounts"] if a["internalId"] == acct_id]
             if not acct_data:
-                raise ValueError(f"Account ID {row.get('Account ID')} is not found in this Netsuite account")
+                raise ValueError(f"Account Id {row.get('Account Id')} is not found in this Netsuite account")
 
         #  Using Account Number if provided 
         elif ref_data.get("Accounts") and row.get("Account Number") and not pd.isna(row.get("Account Number")):
@@ -235,7 +238,7 @@ def build_lines(x, ref_data, config):
                 logger.warning(f"{acct_name} is not valid for this netsuite account, skipping line")
                 continue
         else: 
-            raise TypeError(f"Account ID, Account Number, or Account Name is required")
+            raise TypeError(f"Account Id, Account Number, or Account Name is required")
 
         acct_data = acct_data[0]
         ref_acct = {
@@ -570,7 +573,7 @@ def read_input_data(config):
     ]
     
     # At least one account identifier column is required
-    ACCOUNT_COLS = ["Account ID", "Account Number", "Account Name"]
+    ACCOUNT_COLS = ["Account Id", "Account Number", "Account Name"]
     
     # Verify it has required columns
     if not all(col in cols for col in REQUIRED_COLS):

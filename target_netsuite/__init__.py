@@ -140,6 +140,19 @@ def get_reference_data(ns_client, input_data):
     ):
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
 
+    if "Tax Code" in input_data.columns:
+        reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name"])
+
+    if "Tax Account" in input_data.columns:
+        try:
+            reference_data["Tax Accounts"] = ns_client.entities["TaxAccounts"](ns_client.client).get_all(["name"])
+        except NetSuiteRequestError as e:
+            if getattr(e, "code", None) == "FEATURE_DISABLED" or "Not SuiteTax" in str(e):
+                tax_types_entity = ns_client.entities["TaxTypes"](ns_client.client)
+                reference_data["Tax Accounts"] = tax_types_entity.get_tax_accounts()
+            else:
+                raise e
+
     return reference_data
 
 def log_for_journal_entry(journal_entry, ref_data):
@@ -472,6 +485,29 @@ def build_lines(x, ref_data, config):
         # Insert the Journal Entry to the memo field
         if "Description" in x.columns:
             journal_entry_line["memo"] = row["Description"]
+        
+        ### Tax Account, Tax Code, Tax Rate, Debit Tax, or Credit Tax
+        if ref_data.get("Tax Accounts") and row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
+            acct_name = str(row["Tax Account"])
+            acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
+            if not acct_data:
+                raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
+            journal_entry_line["taxAccount"] = acct_data[0]
+        
+        if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
+            code_name = str(row["Tax Code"])
+            code_data = [c for c in ref_data["Tax Codes"] if c["name"] == code_name]
+            if not code_data:
+                raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
+            journal_entry_line["lineTaxCode"] = code_data[0]
+
+        if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):
+            journal_entry_line["lineTaxRate"] = row["Tax Rate"]
+        
+        if row.get("Debit Tax") and not pd.isna(row.get("Debit Tax")):
+            journal_entry_line["debitTax"] = row["Debit Tax"]
+        elif row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
+            journal_entry_line["creditTax"] = row["Credit Tax"]
         
         line_items.append(journal_entry_line)
 

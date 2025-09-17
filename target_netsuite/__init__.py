@@ -491,16 +491,14 @@ def build_lines(x, ref_data, config):
             acct_name = str(row["Tax Account"])
             acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
             if not acct_data:
-                logger.warning(f"{acct_name} is not a valid tax account for this netsuite account, skipping line")
-                continue
+                raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
             journal_entry_line["taxAccount"] = acct_data[0]
         
         if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
             code_name = str(row["Tax Code"])
             code_data = [c for c in ref_data["Tax Codes"] if c["name"] == code_name]
             if not code_data:
-                logger.warning(f"{code_name} is not a valid tax code for this netsuite account, skipping line")
-                continue
+                raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
             journal_entry_line["lineTaxCode"] = code_data[0]
 
         if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):

@@ -89,6 +89,119 @@ class Items(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Item')
 
+class TaxCodes(BaseFilter):
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='SalesTaxItem')
+
+class TaxAccounts(BaseFilter):
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='TaxAcct')
+
+    # TaxAcct is not a searchable type; use getAll instead
+    def get_page(self):
+        yield self._get_all()
+
+    def get_all(self, selected_fileds=[]):
+        return self._get_all()
+
+    def get_all_generator(self, page_size=1000, last_modified_date=None):
+        for r in self._get_all_generator():
+            yield r
+
+class TaxTypes(BaseFilter):
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='TaxType')
+    
+    def get_page(self):
+        yield self._get_all()
+
+    def get_all(self, selected_fileds=[]):
+        return self._get_all()
+
+    def get_all_generator(self, page_size=1000, last_modified_date=None):
+        for r in self._get_all_generator():
+            yield r
+
+    # SuiteTax-safe helpers
+    def _get_select_value_page(self, record_type, field_id, page_index=1):
+        """Attempt to call NetSuite getSelectValue for a single page.
+
+        Tries multiple client method names for compatibility across netsuitesdk versions.
+        Returns a list of {internalId, name} dicts for the page or an empty list on failure.
+        """
+        try:
+            # Use account-specific service with auth headers
+            field_desc = {'recordType': record_type}
+            if field_id:
+                field_desc['field'] = field_id
+            res = self.ns_client.request('getSelectValue', fieldDescription=field_desc, pageIndex=page_index)
+            result = getattr(res, 'body', None)
+            result = getattr(result, 'getSelectValueResult', result)
+            base_ref_list = getattr(result, 'baseRefList', None)
+            base_refs = getattr(base_ref_list, 'baseRef', None) if base_ref_list is not None else None
+            values = []
+            for v in base_refs or []:
+                vd = getattr(v, '__dict__', {}).get('__values__') if hasattr(v, '__dict__') else v
+                if isinstance(vd, dict):
+                    values.append({
+                        'internalId': vd.get('internalId') or vd.get('internal_id') or vd.get('value'),
+                        'name': vd.get('name') or vd.get('text')
+                    })
+            return [x for x in values if x.get('internalId')]
+        except Exception as e:
+            logger.error(f"Error getting select value: {e}")
+            return []
+
+    def get_tax_types_via_select(self):
+        """List all Tax Types using getSelectValue with pagination.
+
+        Returns a list of {internalId, name}.
+        """
+        results = []
+        page = 1
+        results = []
+        while True:
+            page_values = self._get_select_value_page(record_type='salesTaxItem', field_id='taxType', page_index=page)
+            if not page_values:
+                break
+            results.extend(page_values)
+            page += 1
+        # Deduplicate by internalId while keeping first name encountered
+        unique = {}
+        for r in results:
+            if r.get('internalId') and r['internalId'] not in unique:
+                unique[r['internalId']] = r
+        return list(unique.values())
+
+    def get_tax_accounts(self):
+        """Fetch Tax Types and their linked Tax Control Accounts.
+
+        - Uses getSelectValue to list Tax Types
+        - For each Tax Type, calls get to fetch the record
+        - Extracts likely account references (liability/sales and asset/purchase)
+        - Optionally fetches full TaxAcct records via getList
+        Returns a list of dicts per Tax Type.
+        """
+        types = self.get_tax_types_via_select()
+        results = []
+        for t in types:
+            try:
+                rec = self.get(internalId=t['internalId'])
+            except Exception as e:
+                logger.error(f"Error getting tax type: {e}")
+                rec = None
+                continue
+
+            nexus_accounts_list = rec.nexusAccountsList
+            if nexus_accounts_list is not None:
+                nexus_accounts = nexus_accounts_list.taxTypeNexusAccounts or []
+                for na in nexus_accounts:
+                    if na.payablesAccount is not None:
+                        results.append(na.payablesAccount)
+                    if na.receivablesAccount is not None:
+                        results.append(na.receivablesAccount)
+
+        return results
 
 class JournalEntries(ApiBase):
     def __init__(self, ns_client):

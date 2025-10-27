@@ -147,7 +147,7 @@ def get_reference_data(ns_client, input_data):
         try:
             reference_data["Tax Accounts"] = ns_client.entities["TaxAccounts"](ns_client.client).get_all(["name"])
         except NetSuiteRequestError as e:
-            if getattr(e, "code", None) == "FEATURE_DISABLED" or "Not SuiteTax" in str(e):
+            if getattr(e, "code", None) in ["FEATURE_DISABLED", "USER_ERROR"] or "Not SuiteTax" in str(e):
                 tax_types_entity = ns_client.entities["TaxTypes"](ns_client.client)
                 reference_data["Tax Accounts"] = tax_types_entity.get_tax_accounts()
             else:
@@ -503,6 +503,8 @@ def build_lines(x, ref_data, config):
             ]
             if not code_data:
                 raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
+            del code_data[0]["taxType"]
+            del code_data[0]["itemId"]
             journal_entry_line["lineTaxCode"] = code_data[0]
 
         if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):

@@ -141,7 +141,7 @@ def get_reference_data(ns_client, input_data):
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
 
     if "Tax Code" in input_data.columns:
-        reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name"])
+        reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name", "taxType", "itemId"])
 
     if "Tax Account" in input_data.columns:
         try:
@@ -496,7 +496,11 @@ def build_lines(x, ref_data, config):
         
         if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
             code_name = str(row["Tax Code"])
-            code_data = [c for c in ref_data["Tax Codes"] if c["name"] == code_name]
+            code_data = [
+                c for c in ref_data["Tax Codes"] 
+                if c["name"] is not None and code_name == c["name"]  
+                or (c["taxType"] is not None and c["itemId"] is not None) and code_name == f"{c['taxType'].name}:{c['itemId']}"
+            ]
             if not code_data:
                 raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
             journal_entry_line["lineTaxCode"] = code_data[0]

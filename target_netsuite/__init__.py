@@ -141,13 +141,13 @@ def get_reference_data(ns_client, input_data):
         reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
 
     if "Tax Code" in input_data.columns:
-        reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name"])
+        reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name", "taxType", "itemId"])
 
     if "Tax Account" in input_data.columns:
         try:
             reference_data["Tax Accounts"] = ns_client.entities["TaxAccounts"](ns_client.client).get_all(["name"])
         except NetSuiteRequestError as e:
-            if getattr(e, "code", None) == "FEATURE_DISABLED" or "Not SuiteTax" in str(e):
+            if getattr(e, "code", None) in ["FEATURE_DISABLED", "USER_ERROR"] or "Not SuiteTax" in str(e):
                 tax_types_entity = ns_client.entities["TaxTypes"](ns_client.client)
                 reference_data["Tax Accounts"] = tax_types_entity.get_tax_accounts()
             else:
@@ -190,6 +190,30 @@ def log_for_journal_entry(journal_entry, ref_data):
         logger.info(f"Accounts: {accounts}")
     except:
         pass
+
+def get_tax_code(tax_code, tax_codes):
+    code_data = None
+    for c in tax_codes:
+        if c["name"] is not None and tax_code == c["name"]:
+            code_data = c
+            break
+        
+        if ":" in tax_code:
+            if c["taxType"] is not None and c["itemId"] is not None and tax_code == f"{c['taxType'].name}:{c['itemId']}":
+                code_data = c
+                break
+        else:
+            if c["itemId"] is not None and tax_code == c["itemId"]:
+                code_data = c
+                break
+        
+    if not code_data:
+        raise ValueError(f"{tax_code} is not a valid tax code for this netsuite account")
+    return {
+        "name": code_data["name"],
+        "internalId": code_data["internalId"],
+        "externalId": code_data["externalId"],
+    }
 
 def build_lines(x, ref_data, config):
 
@@ -492,14 +516,19 @@ def build_lines(x, ref_data, config):
             acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
             if not acct_data:
                 raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
-            journal_entry_line["taxAccount"] = acct_data[0]
+            acct_data = acct_data[0]
+            journal_entry_line["taxAccount"] = {
+                "name": acct_data["name"],
+                "internalId": acct_data["internalId"],
+                "externalId": acct_data["externalId"],
+            }
         
         if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
             code_name = str(row["Tax Code"])
-            code_data = [c for c in ref_data["Tax Codes"] if c["name"] == code_name]
+            code_data = get_tax_code(code_name, ref_data["Tax Codes"])
             if not code_data:
                 raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
-            journal_entry_line["lineTaxCode"] = code_data[0]
+            journal_entry_line["lineTaxCode"] = code_data
 
         if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):
             journal_entry_line["lineTaxRate"] = row["Tax Rate"]
@@ -508,7 +537,6 @@ def build_lines(x, ref_data, config):
             journal_entry_line["debitTax"] = row["Debit Tax"]
         elif row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
             journal_entry_line["creditTax"] = row["Credit Tax"]
-        
         line_items.append(journal_entry_line)
 
     # Get the currency ID

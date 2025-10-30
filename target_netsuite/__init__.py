@@ -149,7 +149,7 @@ def get_reference_data(ns_client, input_data):
         except NetSuiteRequestError as e:
             if getattr(e, "code", None) in ["FEATURE_DISABLED", "USER_ERROR"] or "Not SuiteTax" in str(e):
                 tax_types_entity = ns_client.entities["TaxTypes"](ns_client.client)
-                reference_data["Tax Accounts"] = tax_types_entity.get_tax_accounts()
+                reference_data["Tax Accounts"], reference_data["Nexuses"] = tax_types_entity.get_tax_accounts()
             else:
                 raise e
 
@@ -219,6 +219,7 @@ def build_lines(x, ref_data, config):
 
     line_items = []
     subsidiaries = {}
+    nexus = None
     journal_subsidiary = x["Subsidiary"].iloc[0] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
     if journal_subsidiary:
         if isinstance(journal_subsidiary, str) and journal_subsidiary.isdigit():
@@ -522,6 +523,8 @@ def build_lines(x, ref_data, config):
                 "internalId": acct_data["internalId"],
                 "externalId": acct_data["externalId"],
             }
+            if ref_data.get("Nexuses"):
+                nexus = ref_data.get("Nexuses").get(acct_data["internalId"])
         
         if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
             code_name = str(row["Tax Code"])
@@ -572,7 +575,8 @@ def build_lines(x, ref_data, config):
         "tranDate": created_date,
         "externalId": x["Journal Entry Id"].iloc[0],
         "lineList": line_items,
-        "currency": currency_ref
+        "currency": currency_ref,
+        "nexus": nexus
     }
 
     if "JournalDesc" in x.columns:

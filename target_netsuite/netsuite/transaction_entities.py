@@ -184,6 +184,7 @@ class TaxTypes(BaseFilter):
         """
         types = self.get_tax_types_via_select()
         results = []
+        nexuses = {}
         for t in types:
             try:
                 rec = self.get(internalId=t['internalId'])
@@ -198,10 +199,14 @@ class TaxTypes(BaseFilter):
                 for na in nexus_accounts:
                     if na.payablesAccount is not None:
                         results.append(na.payablesAccount)
+                        if na.nexus is not None:
+                            nexuses[na.payablesAccount.internalId] = na.nexus
                     if na.receivablesAccount is not None:
                         results.append(na.receivablesAccount)
+                        if na.nexus is not None:
+                            nexuses[na.receivablesAccount.internalId] = na.nexus
 
-        return results
+        return results, nexuses
 
 class JournalEntries(ApiBase):
     def __init__(self, ns_client):
@@ -292,6 +297,9 @@ class JournalEntries(ApiBase):
 
         if 'department' in data:
             je['department'] = data['department']
+        
+        if 'nexus' in data:
+            je['nexus'] = data['nexus']
 
         logger.info(
             f"Posting JournalEntries now with {len(je['lineList']['line'])} entries. ExternalId {je['externalId']} tranDate {je['tranDate']}")

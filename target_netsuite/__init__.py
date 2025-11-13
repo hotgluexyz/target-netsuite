@@ -252,21 +252,39 @@ def build_lines(x, ref_data, config):
             if len(acct_data) > 1 and row.get("Account Name"):
                 logging.info(f"Multiple accounts with account number {row.get('Account Number')}, using account name to resolve")
                 acct_name = str(row["Account Name"])
-                acct_parent_names = [
-                    s["parent"]["name"] + " : " + s["acctName"]
-                    for s in ref_data["Accounts"]
-                    if s.get("parent") is not None
-                ]
-                acct_noparent_names = [s["acctName"] for s in ref_data["Accounts"] if s.get("parent") is None]
-                acct_names = acct_parent_names + acct_noparent_names
-                acct_name = get_close_matches(acct_name, acct_names)
-                acct_name = max(acct_name, key=acct_name.get)
-                acct_data = [a for a in ref_data["Accounts"] if (a.get("parent") and (a["parent"]["name"] + " : " + a["acctName"]) == acct_name) or (a["acctName"]==acct_name)]
+
+                # try to match by account name for only those accounts that have the same account number
+                possible_accts = acct_data
+                # try exact match first
+                acct_data = [a for a in possible_accts if a["acctName"] == acct_name]
+
+                # if no exact match, try to match by account name ignoring case
                 if len(acct_data) == 0:
-                    possible_accts = [a["acctName"] for a in ref_data["Accounts"]]
-                    raise ValueError(
-                        f"Account Number {row.get('Account Number')} with Account Name {row.get('Account Name')} doesn't match options. Available options are: {possible_accts}"
-                    )
+                    acct_data = [a for a in possible_accts if str(a["acctName"]).lower() == acct_name.lower()]
+
+                # if still no match or multiple matches, try to match by account name with close matches
+                if len(acct_data) != 1:
+                    acct_parent_names = [
+                        s["parent"]["name"] + " : " + s["acctName"]
+                        for s in possible_accts
+                        if s.get("parent") is not None
+                    ]
+                    acct_noparent_names = [s["acctName"] for s in possible_accts if s.get("parent") is None]
+                    acct_names = acct_parent_names + acct_noparent_names
+                    acct_name = get_close_matches(acct_name, acct_names)
+
+                    if len(acct_name) == 0:
+                        raise ValueError(
+                            f"Account Number {row.get('Account Number')} with Account Name {row.get('Account Name')} doesn't match options. Available options are: {possible_accts}"
+                        )
+
+                    acct_name = max(acct_name, key=acct_name.get)
+                    acct_data = [a for a in possible_accts if (a.get("parent") and (a["parent"]["name"] + " : " + a["acctName"]) == acct_name) or (a["acctName"]==acct_name)]
+                    if len(acct_data) == 0:
+                        possible_accts = [a["acctName"] for a in possible_accts]
+                        raise ValueError(
+                            f"Account Number {row.get('Account Number')} with Account Name {row.get('Account Name')} doesn't match options. Available options are: {possible_accts}"
+                        )
 
         # Using Account Name if provided
         elif ref_data.get("Accounts") and row.get("Account Name") and not pd.isna(row.get("Account Name")):

@@ -529,35 +529,57 @@ def build_lines(x, ref_data, config):
         if "Description" in x.columns:
             journal_entry_line["memo"] = row["Description"]
         
-        ### Tax Account, Tax Code, Tax Rate, Debit Tax, or Credit Tax
-        if ref_data.get("Tax Accounts") and row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
-            acct_name = str(row["Tax Account"])
-            acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
-            if not acct_data:
-                raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
-            acct_data = acct_data[0]
-            journal_entry_line["taxAccount"] = {
-                "name": acct_data["name"],
-                "internalId": acct_data["internalId"],
-                "externalId": acct_data["externalId"],
-            }
-            if ref_data.get("Nexuses"):
-                nexus = ref_data.get("Nexuses").get(acct_data["internalId"])
-        
-        if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
-            code_name = str(row["Tax Code"])
-            code_data = get_tax_code(code_name, ref_data["Tax Codes"])
-            if not code_data:
-                raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
-            journal_entry_line["lineTaxCode"] = code_data
+        # if nexuses are present, suitetax is enabled, use suitetax compatible field names
+        if ref_data.get("Nexuses"):
+            ### Tax Account, Tax Code, Tax Rate, Debit Tax, or Credit Tax
+            if ref_data.get("Tax Accounts") and row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
+                acct_name = str(row["Tax Account"])
+                acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
+                if not acct_data:
+                    raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
+                acct_data = acct_data[0]
+                journal_entry_line["taxAccount"] = {
+                    "name": acct_data["name"],
+                    "internalId": acct_data["internalId"],
+                    "externalId": acct_data["externalId"],
+                }
+                if ref_data.get("Nexuses"):
+                    nexus = ref_data.get("Nexuses").get(acct_data["internalId"])
+            
+            if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
+                code_name = str(row["Tax Code"])
+                code_data = get_tax_code(code_name, ref_data["Tax Codes"])
+                if not code_data:
+                    raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
+                journal_entry_line["lineTaxCode"] = code_data
 
-        if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):
-            journal_entry_line["lineTaxRate"] = row["Tax Rate"]
-        
-        if row.get("Debit Tax") and not pd.isna(row.get("Debit Tax")):
-            journal_entry_line["debitTax"] = row["Debit Tax"]
-        elif row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
-            journal_entry_line["creditTax"] = row["Credit Tax"]
+            if row.get("Tax Rate") and not pd.isna(row.get("Tax Rate")):
+                journal_entry_line["lineTaxRate"] = row["Tax Rate"]
+            
+            if row.get("Debit Tax") and not pd.isna(row.get("Debit Tax")):
+                journal_entry_line["debitTax"] = row["Debit Tax"]
+            elif row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
+                journal_entry_line["creditTax"] = row["Credit Tax"]
+        else:
+            # use non suitetax compatible field names
+            if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
+                code_name = str(row["Tax Code"])
+                code_data = get_tax_code(code_name, ref_data["Tax Codes"])
+                if not code_data:
+                    raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
+                journal_entry_line["taxCode"] = {"internalId": code_data["internalId"]}
+            if row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
+                acct_name = str(row["Tax Account"])
+                acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
+                if not acct_data:
+                    raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
+                acct_data = acct_data[0]
+                journal_entry_line["tax1Acct"] = {"internalId": acct_data["internalId"]}
+            if row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
+                journal_entry_line["tax1Amt"] = row["Credit Tax"]
+            elif row.get("Debit Tax") and not pd.isna(row.get("Debit Tax")):
+                journal_entry_line["tax1Amt"] = row["Debit Tax"]
+
         line_items.append(journal_entry_line)
 
     # Get the currency ID

@@ -150,15 +150,15 @@ def get_reference_data(ns_client, input_data):
             if getattr(e, "code", None) in ["FEATURE_DISABLED", "USER_ERROR"] or "Not SuiteTax" in str(e):
                 tax_types_entity = ns_client.entities["TaxTypes"](ns_client.client)
                 reference_data["Tax Accounts"], reference_data["Nexuses"] = tax_types_entity.get_tax_accounts()
-                # look up tax account numbers for the tax accounts
-                # couldn't make the API call return the tax account numbers directly
-                if reference_data["Accounts"]:
-                    for tax_account in reference_data["Tax Accounts"]:
-                        account = [acct for acct in reference_data["Accounts"] if acct["internalId"] == tax_account["internalId"]]
-                        if account:
-                            tax_account["acctnumber"] = account[0].get("acctNumber")
             else:
                 raise e
+        # look up tax account numbers for the tax accounts
+        # couldn't make the API call return the tax account numbers directly
+        if reference_data.get("Tax Accounts") and reference_data.get("Accounts"):
+            for tax_account in reference_data["Tax Accounts"]:
+                account = [acct for acct in reference_data["Accounts"] if acct["internalId"] == tax_account["internalId"]]
+                if account:
+                    tax_account["acctnumber"] = account[0].get("acctNumber")
 
     return reference_data
 
@@ -587,15 +587,27 @@ def build_lines(x, ref_data, config):
                 if not code_data:
                     raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
                 journal_entry_line["taxCode"] = {"internalId": code_data["internalId"]}
-            if row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
+
+            found_acct_data = None
+            if ref_data.get("Tax Accounts") and row.get("Tax Account Number") and not pd.isna(row.get("Tax Account Number")):
+                acct_number = stringify_number(row["Tax Account Number"])
+                acct_data = [a for a in ref_data["Tax Accounts"] if "acctnumber" in a and a["acctnumber"] == acct_number]
+                if not acct_data:
+                    raise ValueError(f"{acct_number} is not a valid tax account for this netsuite account")
+                found_acct_data = acct_data[0]
+            
+            if not found_acct_data and row.get("Tax Account") and not pd.isna(row.get("Tax Account")):
                 acct_name = stringify_number(row["Tax Account"])
                 acct_data = [a for a in ref_data["Tax Accounts"] if a["internalId"] == acct_name]
                 if not acct_data:
                     acct_data = [a for a in ref_data["Tax Accounts"] if a["name"] == acct_name]
                 if not acct_data:
                     raise ValueError(f"{acct_name} is not a valid tax account for this netsuite account")
-                acct_data = acct_data[0]
-                journal_entry_line["tax1Acct"] = {"internalId": acct_data["internalId"]}
+                found_acct_data = acct_data[0]
+            
+            if found_acct_data:
+                journal_entry_line["tax1Acct"] = {"internalId": found_acct_data["internalId"]}
+
             if row.get("Credit Tax") and not pd.isna(row.get("Credit Tax")):
                 journal_entry_line["tax1Amt"] = row["Credit Tax"]
             elif row.get("Debit Tax") and not pd.isna(row.get("Debit Tax")):

@@ -412,6 +412,8 @@ def build_lines(x, ref_data, config):
                         "externalId": dept_data.get("externalId"),
                         "internalId": dept_data.get("internalId"),
                     }
+            else:
+                logger.warning(f"Department {row['Department']} not found. Available departments: {dept_names}")
 
         # Get the NetSuite Location Ref
         if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):
@@ -745,7 +747,7 @@ def upload_journals(config, ns_client):
     # Post the journal entries to Netsuite
     for journal in journals:
         logger.info(f"Posting journal: {journal}")
-        response = post_journal_entries(journal, ns_client, reference_data)
+        # response = post_journal_entries(journal, ns_client, reference_data)
         logger.info(f"Posted journal: {json.dumps(response, default=str)}")
 
     logger.info(f"Posted journal entries: ")

@@ -412,6 +412,8 @@ def build_lines(x, ref_data, config):
                         "externalId": dept_data.get("externalId"),
                         "internalId": dept_data.get("internalId"),
                     }
+            else:
+                logger.warning(f"Department {row['Department']} not found. Omitting department from journal entry line")
 
         # Get the NetSuite Location Ref
         if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):

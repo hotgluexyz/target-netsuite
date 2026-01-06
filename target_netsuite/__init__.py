@@ -393,7 +393,16 @@ def build_lines(x, ref_data, config):
                     }
 
         # Get the NetSuite Department Ref
-        if ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
+        # Using Department Id if provided (highest priority - passes through directly without lookup)
+        if row.get("Department Id") and not pd.isna(row.get("Department Id")):
+            dept_id = stringify_number(row["Department Id"])
+            journal_entry_line["department"] = {
+                "name": None,
+                "externalId": None,
+                "internalId": dept_id,
+            }
+        # Using Department name if provided (fallback to name lookup)
+        elif ref_data.get("Departments") and row.get("Department") and not pd.isna(row.get("Department")):
             department_parent_names = [
                 c["parent"]["name"] + " : " + c["name"]
                 for c in ref_data["Departments"]

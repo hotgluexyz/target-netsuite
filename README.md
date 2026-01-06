@@ -36,7 +36,7 @@ $ target-netsuite --config config.json
 ```
 The `input_path` is the path for the input JournalEntries csv file.
 
-The `is_sandbox` should always be set to "true" if you are connecting Production account of NetSuite. Set it to false if you want to connect to SandBox acccount. 
+The `is_sandbox` should be set to `true` if you are connecting to a NetSuite **Sandbox** account, and `false` if you are connecting to a NetSuite **Production** account.
 
 The `ns_account` is your account Id. This can be found under Setup -> Company -> Company Information. Look for Account Id. Note "_SB" is for Sandbox account.
 
@@ -57,6 +57,17 @@ The csv file follows the configuration pattern below:
 Transaction Date,Journal Entry Id,Account Number,Account Name,Class,Location,Department,Customer Name,Description,Amount,Posting Type,Currency
 7/25/25,Jul25 Comm,2000,Deferred Commission,ENT,Texas,Marketing,,Jul25 Event,1234.56,Debit,USD
 7/25/25,Jul25 Comm,4000,Contra Commission,ENT,Texas,Marketing,,Jul25 Event,1234.56,Credit,USD
+```
+
+### Department Id (Alternative to Department Name)
+
+Instead of using the `Department` column with a department name (which performs a lookup against NetSuite's department list), you can use the `Department Id` column to pass the internal ID directly without lookup. If both `Department` and `Department Id` are provided, `Department Id` takes priority.
+
+**Example using Department Id:**
+```
+Transaction Date,Journal Entry Id,Account Number,Account Name,Class,Location,Department Id,Customer Name,Description,Amount,Posting Type,Currency
+7/27/25,Test JE 1,58,Expenses,Project 2,USA,4,,Test using Department Id,250.00,Debit,USD
+7/27/25,Test JE 1,4050,Shipping and Handling,Project 2,USA,4,,Test using Department Id,250.00,Credit,USD
 ```
 
 ## Run Target

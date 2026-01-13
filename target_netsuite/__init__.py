@@ -142,6 +142,12 @@ def get_reference_data(ns_client, input_data):
 
     if "Tax Code" in input_data.columns:
         reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name", "taxType", "itemId"])
+        try:
+            reference_data["Tax Groups"] = ns_client.entities["TaxGroups"](ns_client.client).get_all(["itemId"])
+        except Exception as e:
+            # TODO: if netsuitetax is enabled the request will fail, so we need to handle this case
+            logger.warning(f"It was not possible to retrieve Tax Groups data: {e}")
+            reference_data["Tax Groups"] = []
 
     if "Tax Account" in input_data.columns or "Tax Account Number" in input_data.columns:
         try:
@@ -594,7 +600,14 @@ def build_lines(x, ref_data, config):
             # use non suitetax compatible field names
             if ref_data.get("Tax Codes") and row.get("Tax Code") and not pd.isna(row.get("Tax Code")):
                 code_name = str(row["Tax Code"])
-                code_data = get_tax_code(code_name, ref_data["Tax Codes"])
+
+                code_data = [a for a in ref_data.get("Tax Groups", []) if a.get("itemId") == code_name]
+
+                if code_data:
+                    code_data = code_data[0]
+                else:
+                    code_data = get_tax_code(code_name, ref_data["Tax Codes"])
+                
                 if not code_data:
                     raise ValueError(f"{code_name} is not a valid tax code for this netsuite account")
                 journal_entry_line["taxCode"] = {"internalId": code_data["internalId"]}

@@ -208,6 +208,12 @@ class TaxTypes(BaseFilter):
 
         return results, nexuses
 
+
+class TaxGroups(BaseFilter):
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='TaxGroup')
+
+
 class JournalEntries(ApiBase):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='journalEntry')

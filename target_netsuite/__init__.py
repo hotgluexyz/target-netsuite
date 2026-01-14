@@ -537,7 +537,7 @@ def build_lines(x, ref_data, config):
             value = row.get(entry.get("input_id"))
             ns_id = entry.get("netsuite_id")
             if value:
-                custom_field_values.append([{"type": "Select", "scriptId": ns_id, "value": value}])
+                custom_field_values.extend([{"type": "Select", "scriptId": ns_id, "value": value}])
 
         if custom_field_values:
             journal_entry_line["customFieldList"] = custom_field_values

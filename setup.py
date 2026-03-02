@@ -14,7 +14,7 @@ setup(
         'requests==2.20.0',
         'pandas==1.3.4',
         'argparse==1.4.0',
-        'netsuitesdk==2.7.0',
+        'netsuitesdk==3.1.2',
         'singer-python==5.12.2'
     ],
     entry_points='''

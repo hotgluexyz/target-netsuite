@@ -785,7 +785,11 @@ def upload_journals(config, ns_client):
             response = post_journal_entries(journal, ns_client, reference_data)
             logger.info(f"Posted journal: {json.dumps(response, default=str)}")
             response_data = json.loads(response)
-            internal_id = response_data.get("JournalEntry", {}).get("internalId")
+            internal_id = (
+                response_data.get("JournalEntry", {})
+                .get("baseRef", {})
+                .get("internalId")
+            )
             if internal_id:
                 posted_internal_ids.append(internal_id)
     except Exception as e:

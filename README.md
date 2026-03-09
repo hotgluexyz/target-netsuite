@@ -77,3 +77,7 @@ To run the target, execute it with the config file.
 ```
 > target-netsuite --config config.json
 ```
+
+## Failure Rollback
+
+If any journal entry fails to post, the target automatically rolls back all journal entries that were successfully posted during that same run by deleting them from NetSuite. This ensures the job either completes fully or leaves no partial data behind.

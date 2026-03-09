@@ -12,6 +12,7 @@ setup(
     py_modules=['target_netsuite'],
     install_requires=[
         'requests==2.20.0',
+        'numpy<2.0',
         'pandas==1.3.4',
         'argparse==1.4.0',
         'netsuitesdk==3.1.2',

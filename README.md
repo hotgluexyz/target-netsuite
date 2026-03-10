@@ -81,3 +81,5 @@ To run the target, execute it with the config file.
 ## Failure Rollback
 
 If any journal entry fails to post, the target automatically rolls back all journal entries that were successfully posted during that same run by deleting them from NetSuite. This ensures the job either completes fully or leaves no partial data behind.
+
+> **Note:** Only newly created entries are rolled back. If a journal entry already existed in NetSuite (i.e. the run was updating it), it will not be deleted on rollback — but it will also not be restored to its previous state.

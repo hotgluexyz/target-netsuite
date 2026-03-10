@@ -702,6 +702,17 @@ def load_journal_entries(input_data, reference_data, config):
     return lines.values
 
 
+def journal_entry_exists(ns_client, external_id):
+    try:
+        ns_client.client.get(recordType='JournalEntry', externalId=external_id)
+        return True
+    except NetSuiteRequestError:
+        return False
+    except Exception as e:
+        logger.warning(f"Unexpected error checking existence of JournalEntry externalId='{external_id}': {e}. Assuming new entry.")
+        return False
+
+
 def delete_journal_entries(ns_client, internal_ids):
     entity = "JournalEntry"
     for internal_id in internal_ids:
@@ -781,15 +792,20 @@ def upload_journals(config, ns_client):
     posted_internal_ids = []
     try:
         for journal in journals:
+            external_id = journal.get("externalId")
+            is_existing = journal_entry_exists(ns_client, external_id) if external_id else False
+
             logger.info(f"Posting journal: {journal}")
             response = post_journal_entries(journal, ns_client, reference_data)
             logger.info(f"Posted journal: {json.dumps(response, default=str)}")
-            response_data = json.loads(response)
-            internal_id = response_data.get("JournalEntry", {}).get("internalId")
-            if internal_id:
-                posted_internal_ids.append(internal_id)
+
+            if not is_existing:
+                response_data = json.loads(response)
+                internal_id = response_data.get("JournalEntry", {}).get("internalId")
+                if internal_id:
+                    posted_internal_ids.append(internal_id)
     except Exception as e:
-        logger.error(f"Posting failed. Rolling back {len(posted_internal_ids)} posted journal(s)...")
+        logger.error(f"Posting failed. Rolling back {len(posted_internal_ids)} newly posted journal(s)...")
         delete_journal_entries(ns_client, posted_internal_ids)
         raise
 

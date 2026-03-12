@@ -709,8 +709,8 @@ def journal_entry_exists(ns_client, external_id):
     except NetSuiteRequestError:
         return False
     except Exception as e:
-        logger.warning(f"Unexpected error checking existence of JournalEntry externalId='{external_id}': {e}. Assuming new entry.")
-        return False
+        logger.warning(f"Unexpected error checking existence of JournalEntry externalId='{external_id}': {e}. Will not rollback this journal entry on error.")
+        return True
 
 
 def delete_journal_entries(ns_client, internal_ids):

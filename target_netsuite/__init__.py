@@ -702,6 +702,28 @@ def load_journal_entries(input_data, reference_data, config):
     return lines.values
 
 
+def journal_entry_exists(ns_client, external_id):
+    try:
+        ns_client.client.get(recordType='JournalEntry', externalId=external_id)
+        return True
+    except NetSuiteRequestError:
+        return False
+    except Exception as e:
+        logger.warning(f"Unexpected error checking existence of JournalEntry externalId='{external_id}': {e}. Will not rollback this journal entry on error.")
+        return True
+
+
+def delete_journal_entries(ns_client, internal_ids):
+    entity = "JournalEntry"
+    for internal_id in internal_ids:
+        try:
+            logger.info(f"Rolling back: deleting JournalEntry internalId={internal_id}")
+            ns_client.entities[entity](ns_client.client).delete(internalId=internal_id)
+            logger.info(f"Deleted JournalEntry internalId={internal_id}")
+        except Exception as e:
+            logger.error(f"Failed to delete JournalEntry internalId={internal_id}: {e}")
+
+
 def post_journal_entries(journal, ns_client, ref_data):
         entity = "JournalEntry"
         # logger.info(f"Posting data for entity {1}")
@@ -767,10 +789,25 @@ def upload_journals(config, ns_client):
     journals = load_journal_entries(input_data, reference_data, config)
 
     # Post the journal entries to Netsuite
-    for journal in journals:
-        logger.info(f"Posting journal: {journal}")
-        response = post_journal_entries(journal, ns_client, reference_data)
-        logger.info(f"Posted journal: {json.dumps(response, default=str)}")
+    posted_internal_ids = []
+    try:
+        for journal in journals:
+            external_id = journal.get("externalId")
+            is_existing = journal_entry_exists(ns_client, external_id) if external_id else False
+
+            logger.info(f"Posting journal: {journal}")
+            response = post_journal_entries(journal, ns_client, reference_data)
+            logger.info(f"Posted journal: {json.dumps(response, default=str)}")
+
+            if not is_existing:
+                response_data = json.loads(response)
+                internal_id = response_data.get("JournalEntry", {}).get("internalId")
+                if internal_id:
+                    posted_internal_ids.append(internal_id)
+    except Exception as e:
+        logger.error(f"Posting failed. Rolling back {len(posted_internal_ids)} newly posted journal(s)...")
+        delete_journal_entries(ns_client, posted_internal_ids)
+        raise
 
     logger.info(f"Posted journal entries: ")
     logger.info(f"{json.dumps(journals,default=str)}")

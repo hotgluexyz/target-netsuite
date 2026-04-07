@@ -281,7 +281,7 @@ class JournalEntries(ApiBase):
             je['currency'] = self.ns_client.RecordRef(**(data['currency']))
 
         if 'customFieldList' in data:
-            je['customFieldList'] = data['customFieldList']
+            je['customFieldList'] = self.prepare_custom_fields(data)
         
         if 'memo' in data:
             je['memo'] = data['memo']

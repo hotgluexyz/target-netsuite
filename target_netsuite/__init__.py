@@ -231,6 +231,8 @@ def get_tax_code(tax_code, tax_codes):
 def build_lines(x, ref_data, config):
 
     line_items = []
+    header_custom_field_values = []
+    seen_header_custom_field_ids = set()
     subsidiaries = {}
     nexus = None
     journal_subsidiary = x["Subsidiary"].iloc[0] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
@@ -534,10 +536,20 @@ def build_lines(x, ref_data, config):
         custom_fields = config.get("custom_fields") or []
 
         for entry in custom_fields:
-            value = row.get(entry.get("input_id"))
+            input_id = entry.get("input_id")
             ns_id = entry.get("netsuite_id")
-            if value:
-                custom_field_values.extend([{"type": "Select", "scriptId": ns_id, "value": value}])
+            value = row.get(input_id)
+            if not ns_id or value is None or pd.isna(value) or value == "":
+                continue
+
+            field_value = {"type": "Select", "scriptId": ns_id, "value": value}
+            if isinstance(ns_id, str) and ns_id.lower().startswith("custbody"):
+                # Header-level fields should be set once per JE.
+                if ns_id not in seen_header_custom_field_ids:
+                    header_custom_field_values.append(field_value)
+                    seen_header_custom_field_ids.add(ns_id)
+            else:
+                custom_field_values.append(field_value)
 
         if custom_field_values:
             journal_entry_line["customFieldList"] = custom_field_values
@@ -678,6 +690,9 @@ def build_lines(x, ref_data, config):
 
     if "JournalDesc" in x.columns:
         journal_entry["memo"] = "" if pd.isnull(x["JournalDesc"].iloc[0]) else x["JournalDesc"].iloc[0]
+    
+    if header_custom_field_values:
+        journal_entry["customFieldList"] = header_custom_field_values
     
     # Update the entry with subsidiaries
     journal_entry.update(subsidiaries)

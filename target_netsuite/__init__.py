@@ -228,6 +228,334 @@ def get_tax_code(tax_code, tax_codes):
         "externalId": code_data["externalId"],
     }
 
+
+####STARTING HERE WE NEED TO REVIEW THIS CODE AGAIN
+def _normalize_lookup_value(value):
+    return str(value).strip().lower()
+
+
+def _resolve_select_option_internal_id(script_id, value, options_by_name):
+    lookup_key = _normalize_lookup_value(value)
+    if lookup_key in options_by_name:
+        return options_by_name[lookup_key]
+
+    # NetSuite can return parent-qualified labels (e.g. "online : instagram").
+    leaf_key = lookup_key.split(":")[-1].strip()
+    matching_internal_ids = []
+    for option_name, internal_id in options_by_name.items():
+        option_leaf = option_name.split(":")[-1].strip()
+        if option_leaf == leaf_key:
+            matching_internal_ids.append(internal_id)
+
+    if len(matching_internal_ids) == 1:
+        return matching_internal_ids[0]
+
+    if len(matching_internal_ids) > 1:
+        raise ValueError(
+            f"Custom field '{script_id}' value '{value}' is ambiguous. "
+            "Provide the full parent-qualified option label (for example, 'parent : child')."
+        )
+
+    return None
+
+
+def _get_select_value_page(ns_client, field_description, max_pages=30):
+    all_values = []
+    for page_index in range(1, max_pages):
+        try:
+            res = ns_client.client.request(
+                "getSelectValue",
+                fieldDescription=field_description,
+                pageIndex=page_index,
+            )
+            result = getattr(res, "body", None)
+            result = getattr(result, "getSelectValueResult", result)
+            base_ref_list = getattr(result, "baseRefList", None)
+            base_refs = getattr(base_ref_list, "baseRef", None) if base_ref_list is not None else None
+            page_values = []
+            for ref in base_refs or []:
+                ref_values = getattr(ref, "__dict__", {}).get("__values__") if hasattr(ref, "__dict__") else ref
+                if not isinstance(ref_values, dict):
+                    continue
+                internal_id = ref_values.get("internalId") or ref_values.get("internal_id") or ref_values.get("value")
+                name = ref_values.get("name") or ref_values.get("text")
+                if internal_id and name:
+                    page_values.append({"internalId": str(internal_id), "name": str(name)})
+            if not page_values:
+                break
+            all_values.extend(page_values)
+        except Exception as exc:
+            logger.debug(f"Failed getSelectValue request for {field_description} page {page_index}: {exc}")
+            break
+    return all_values
+    # try:
+    #     res = ns_client.client.request("getSelectValue", fieldDescription=field_description, pageIndex=page_index)
+    #     result = getattr(res, "body", None)
+    #     result = getattr(result, "getSelectValueResult", result)
+    #     base_ref_list = getattr(result, "baseRefList", None)
+    #     base_refs = getattr(base_ref_list, "baseRef", None) if base_ref_list is not None else None
+
+    #     values = []
+    #     for ref in base_refs or []:
+    #         ref_values = getattr(ref, "__dict__", {}).get("__values__") if hasattr(ref, "__dict__") else ref
+    #         if not isinstance(ref_values, dict):
+    #             continue
+    #         internal_id = ref_values.get("internalId") or ref_values.get("internal_id") or ref_values.get("value")
+    #         name = ref_values.get("name") or ref_values.get("text")
+    #         if internal_id and name:
+    #             values.append({"internalId": str(internal_id), "name": str(name)})
+    #     return values
+    # except Exception as exc:
+    #     logger.debug(f"Failed getSelectValue request for {field_description}: {exc}")
+    #     return []
+
+
+# def _get_field_descriptions(script_id):
+#     candidates = []
+#     if script_id.startswith("custbody"):
+#         candidates = [
+#             {"recordType": "journalEntry", "field": script_id},
+#             {"recordType": "transaction", "field": script_id},
+#         ]
+#     else:
+#         candidates = [
+#                 {"recordType": "journalEntry", "sublist": "line", "field": script_id},
+#                 {"recordType": "journalEntry", "sublist": "lineList", "field": script_id},
+#                 {"recordType": "journalEntry", "field": script_id},
+#                 {"recordType": "transaction", "field": script_id},
+#             ]
+
+#     return candidates
+
+def _get_select_options_by_name(ns_client, script_id):
+    field_descriptions = [
+        {"recordType": "journalEntry", "sublist": "lineList", "field": script_id},
+        {"recordType": "journalEntry", "field": script_id},
+    ]
+    for field_description in field_descriptions:
+        collected = _get_select_value_page(ns_client, field_description)
+
+        if collected:
+            options_by_name = {}
+            for entry in collected:
+                options_by_name[_normalize_lookup_value(entry["name"])] = entry["internalId"]
+            return options_by_name
+
+    return {}
+
+
+def _extract_values(obj):
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, "__dict__"):
+        return getattr(obj, "__dict__", {}).get("__values__", {}) or {}
+    return {}
+
+
+def _extract_customization_refs(result_obj):
+    body = getattr(result_obj, "body", None)
+    result = getattr(body, "getCustomizationIdResult", body)
+    ref_list = getattr(result, "customizationRefList", None)
+    refs = getattr(ref_list, "customizationRef", None) if ref_list is not None else None
+    out = []
+    for ref in refs or []:
+        out.append(_extract_values(ref))
+    return out
+
+
+def _find_custom_record_type_id_via_get_customization_id(ns_client, custom_record_type_script_id):
+    attempts = [
+        {"customizationType": "customRecordType", "includeInactives": False},
+        {"getCustomizationType": "customRecordType", "includeInactives": False},
+        {"customizationType": "customRecordType"},
+        {"getCustomizationType": "customRecordType"},
+    ]
+
+    for payload in attempts:
+        try:
+            res = ns_client.client.request("getCustomizationId", **payload)
+            refs = _extract_customization_refs(res)
+            if refs:
+                for ref in refs:
+                    script_id = str(ref.get("scriptId") or "").lower()
+                    if script_id == custom_record_type_script_id.lower():
+                        internal_id = ref.get("internalId")
+                        if internal_id:
+                            logger.debug(
+                                f"Resolved custom record type '{custom_record_type_script_id}' "
+                                f"to internalId={internal_id} via getCustomizationId"
+                            )
+                            return str(internal_id)
+        except Exception as exc:
+            logger.debug(f"getCustomizationId attempt failed ({payload}): {exc}")
+
+    return None
+
+
+def _soap_search_all(ns_client, search_record):
+    records_out = []
+    try:
+        res = ns_client.client.request("search", searchRecord=search_record)
+    except Exception as exc:
+        logger.debug(f"SOAP search failed on first page: {exc}")
+        return records_out
+
+    body = getattr(res, "body", None)
+    result = getattr(body, "searchResult", body)
+    record_list = getattr(result, "recordList", None)
+    first_records = getattr(record_list, "record", None) if record_list is not None else None
+    for r in first_records or []:
+        records_out.append(_extract_values(r))
+
+    search_id = getattr(result, "searchId", None)
+    total_pages = int(getattr(result, "totalPages", 1) or 1)
+
+    if not search_id or total_pages <= 1:
+        return records_out
+
+    for page_index in range(2, total_pages + 1):
+        try:
+            page_res = ns_client.client.request(
+                "searchMoreWithId",
+                searchId=search_id,
+                pageIndex=page_index,
+            )
+            page_body = getattr(page_res, "body", None)
+            page_result = getattr(page_body, "searchResult", page_body)
+            page_record_list = getattr(page_result, "recordList", None)
+            page_records = getattr(page_record_list, "record", None) if page_record_list is not None else None
+            for r in page_records or []:
+                records_out.append(_extract_values(r))
+        except Exception as exc:
+            logger.debug(f"SOAP searchMoreWithId failed (page={page_index}): {exc}")
+            break
+
+    return records_out
+
+
+def _search_custom_records_for_rec_type_ref(ns_client, rec_type_ref, segment_script_id):
+    try:
+        search_record = ns_client.client.basic_search_factory(
+            type_name="CustomRecord",
+            recType=rec_type_ref,
+        )
+    except Exception as exc:
+        logger.debug(f"Could not build CustomRecord search for segment '{segment_script_id}': {exc}")
+        return {}
+
+    records = _soap_search_all(ns_client, search_record)
+    options_by_name = {}
+    for rec in records:
+        name = rec.get("name")
+        internal_id = rec.get("internalId")
+        if name and internal_id:
+            options_by_name[_normalize_lookup_value(name)] = str(internal_id)
+
+    return options_by_name
+
+
+def _get_segment_options_via_custom_record_search(ns_client, segment_script_id):
+    custom_record_type_script_id = f"customrecord_{segment_script_id.lower()}"
+    rec_type_internal_id = _find_custom_record_type_id_via_get_customization_id(
+        ns_client, custom_record_type_script_id
+    )
+    if rec_type_internal_id:
+        options_by_name = _search_custom_records_for_rec_type_ref(
+            ns_client,
+            ns_client.client.RecordRef(internalId=rec_type_internal_id),
+            segment_script_id,
+        )
+        if options_by_name:
+            logger.info(
+                f"Custom Segment '{segment_script_id}' fetched "
+                f"{len(options_by_name)} options via CustomRecord recType internalId={rec_type_internal_id}"
+            )
+            return options_by_name
+
+    logger.debug(f"Custom Segment returned no value for '{segment_script_id}'")
+    return {}
+
+
+def _get_lookup_options_for_custom_field(ns_client, script_id):
+
+    if script_id.startswith("custbody") or script_id.startswith("custcol"):
+        options_by_name = _get_select_options_by_name(ns_client, script_id)
+        if options_by_name:
+            return options_by_name
+
+    elif script_id.lower().startswith("cseg"):
+        # logger.info(
+        #     f"No getSelectValue options for '{script_id}'. Trying SOAP CustomRecord fallback..."
+        # )
+        return _get_segment_options_via_custom_record_search(ns_client, script_id)
+
+    return {}
+
+
+def _prepare_custom_field_lookups(ns_client, input_data, config):
+    custom_fields = config.get("custom_fields") or []
+    custom_field_lookup = {}
+
+    for entry in custom_fields:
+        input_id = entry.get("input_id")
+        script_id = entry.get("netsuite_id")
+        if not input_id or not script_id:
+            continue
+
+        if input_id not in input_data.columns:
+            continue
+
+        values = [v for v in input_data[input_id].dropna().tolist() if str(v).strip() != ""]
+        if not values:
+            continue
+
+        options_by_name = _get_lookup_options_for_custom_field(ns_client, script_id)
+
+        if not options_by_name:
+            # Not all configured fields are List/Record selects.
+            # If options are unavailable, keep legacy passthrough behavior.
+            logger.debug(
+                f"Lookup unavailable for custom field '{script_id}', using passthrough values."
+            )
+            continue
+
+        unique_missing = sorted({
+            str(value)
+            for value in values
+            if _resolve_select_option_internal_id(script_id, value, options_by_name) is None
+        })
+        if unique_missing:
+            raise ValueError(
+                f"Invalid value(s) for custom field '{script_id}': {unique_missing}. "
+                f"Provide a valid option label."
+            )
+
+        custom_field_lookup[script_id] = options_by_name
+        logger.info(
+            f"Lookup enabled for custom field '{script_id}' "
+            f"({len(values)} value(s) checked, {len(options_by_name)} option(s) cached)."
+        )
+
+    config["_custom_field_lookup"] = custom_field_lookup
+
+
+def _resolve_custom_field_value(script_id, value, config):
+    options_by_name = (config.get("_custom_field_lookup") or {}).get(script_id, {})
+    resolved_internal_id = _resolve_select_option_internal_id(script_id, value, options_by_name)
+    if resolved_internal_id is not None:
+        return resolved_internal_id
+    # No lookup table for this field: preserve original value.
+    if not options_by_name:
+        return value
+
+    raise ValueError(
+        f"Custom field '{script_id}' received value '{value}' that could not be resolved to an internalId."
+    )
+
+####UNTIL HERE WE NEED TO REVIEW THIS CODE AGAIN
+
 def build_lines(x, ref_data, config):
 
     line_items = []
@@ -542,13 +870,34 @@ def build_lines(x, ref_data, config):
             if not ns_id or value is None or pd.isna(value) or value == "":
                 continue
 
-            field_value = {"type": "Select", "scriptId": ns_id, "value": value}
-            if isinstance(ns_id, str) and ns_id.lower().startswith("custbody"):
-                # Header-level fields should be set once per JE.
-                if ns_id not in seen_header_custom_field_ids:
-                    header_custom_field_values.append(field_value)
-                    seen_header_custom_field_ids.add(ns_id)
+            resolved_value = _resolve_custom_field_value(ns_id, value, config)
+            field_value = {"type": "Select", "scriptId": ns_id, "value": resolved_value}
+            ns_id_lower = ns_id.lower() if isinstance(ns_id, str) else ""
+            is_custbody_field = ns_id_lower.startswith("custbody")
+            is_custom_segment_field = ns_id_lower.startswith("cseg")
+
+            add_to_header = False
+            add_to_line = False
+
+            if is_custbody_field:
+                add_to_header = True
+            elif is_custom_segment_field:
+                level = entry.get("level")
+                level = level.lower() if isinstance(level, str) else "line"
+                if level not in {"line", "body", "both"}:
+                    level = "line"
+
+                add_to_header = level in {"body", "both"}
+                add_to_line = level in {"line", "both"}
             else:
+                add_to_line = True
+
+            if add_to_header and ns_id not in seen_header_custom_field_ids:
+                # Header-level fields should be set once per JE.
+                header_custom_field_values.append(field_value)
+                seen_header_custom_field_ids.add(ns_id)
+
+            if add_to_line:
                 custom_field_values.append(field_value)
 
         if custom_field_values:
@@ -800,6 +1149,7 @@ def upload_journals(config, ns_client):
     
     # Load reference data
     reference_data = get_reference_data(ns_client, input_data)
+    _prepare_custom_field_lookups(ns_client, input_data, config)
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

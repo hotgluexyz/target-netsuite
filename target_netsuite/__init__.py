@@ -274,16 +274,16 @@ def _get_select_value_page(ns_client, field_description, max_pages=30):
             base_refs = getattr(base_ref_list, "baseRef", None) if base_ref_list is not None else None
             page_values = []
             for ref in base_refs or []:
-                ref_values = getattr(ref, "__dict__", {}).get("__values__") if hasattr(ref, "__dict__") else ref
+                ref_values = _extract_values(ref)
                 if not isinstance(ref_values, dict):
                     continue
                 internal_id = ref_values.get("internalId")
                 name = ref_values.get("name")
                 if internal_id and name:
                     page_values.append({"internalId": str(internal_id), "name": str(name)})
+            all_values.extend(page_values)
             if not page_values or total_pages <= page_index:
                 break
-            all_values.extend(page_values)
         except Exception as exc:
             logger.debug(f"Failed getSelectValue request for {field_description} page {page_index}: {exc}")
             break

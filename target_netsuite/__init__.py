@@ -234,6 +234,8 @@ def _normalize_lookup_value(value):
 
 
 def _resolve_select_option_internal_id(script_id, value, options_by_name):
+    if not options_by_name:
+        return None
     lookup_key = _normalize_lookup_value(value)
     if lookup_key in options_by_name:
         return options_by_name[lookup_key]

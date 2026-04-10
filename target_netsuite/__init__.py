@@ -229,7 +229,6 @@ def get_tax_code(tax_code, tax_codes):
     }
 
 
-####STARTING HERE WE NEED TO REVIEW THIS CODE AGAIN
 def _normalize_lookup_value(value):
     return str(value).strip().lower()
 
@@ -288,44 +287,6 @@ def _get_select_value_page(ns_client, field_description, max_pages=30):
             logger.debug(f"Failed getSelectValue request for {field_description} page {page_index}: {exc}")
             break
     return all_values
-    # try:
-    #     res = ns_client.client.request("getSelectValue", fieldDescription=field_description, pageIndex=page_index)
-    #     result = getattr(res, "body", None)
-    #     result = getattr(result, "getSelectValueResult", result)
-    #     base_ref_list = getattr(result, "baseRefList", None)
-    #     base_refs = getattr(base_ref_list, "baseRef", None) if base_ref_list is not None else None
-
-    #     values = []
-    #     for ref in base_refs or []:
-    #         ref_values = getattr(ref, "__dict__", {}).get("__values__") if hasattr(ref, "__dict__") else ref
-    #         if not isinstance(ref_values, dict):
-    #             continue
-    #         internal_id = ref_values.get("internalId") or ref_values.get("internal_id") or ref_values.get("value")
-    #         name = ref_values.get("name") or ref_values.get("text")
-    #         if internal_id and name:
-    #             values.append({"internalId": str(internal_id), "name": str(name)})
-    #     return values
-    # except Exception as exc:
-    #     logger.debug(f"Failed getSelectValue request for {field_description}: {exc}")
-    #     return []
-
-
-# def _get_field_descriptions(script_id):
-#     candidates = []
-#     if script_id.startswith("custbody"):
-#         candidates = [
-#             {"recordType": "journalEntry", "field": script_id},
-#             {"recordType": "transaction", "field": script_id},
-#         ]
-#     else:
-#         candidates = [
-#                 {"recordType": "journalEntry", "sublist": "line", "field": script_id},
-#                 {"recordType": "journalEntry", "sublist": "lineList", "field": script_id},
-#                 {"recordType": "journalEntry", "field": script_id},
-#                 {"recordType": "transaction", "field": script_id},
-#             ]
-
-#     return candidates
 
 def _get_select_options_by_name(ns_client, script_id):
     field_descriptions = [
@@ -549,7 +510,6 @@ def _resolve_custom_field_value(script_id, value, config):
         f"Custom field '{script_id}' received value '{value}' that could not be resolved to an internalId."
     )
 
-####UNTIL HERE WE NEED TO REVIEW THIS CODE AGAIN
 
 def build_lines(x, ref_data, config):
 

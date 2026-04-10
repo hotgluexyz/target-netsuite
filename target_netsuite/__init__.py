@@ -481,14 +481,9 @@ def _get_segment_options_via_custom_record_search(ns_client, segment_script_id):
 def _get_lookup_options_for_custom_field(ns_client, script_id):
 
     if script_id.startswith("custbody") or script_id.startswith("custcol"):
-        options_by_name = _get_select_options_by_name(ns_client, script_id)
-        if options_by_name:
-            return options_by_name
+        return _get_select_options_by_name(ns_client, script_id)
 
     elif script_id.lower().startswith("cseg"):
-        # logger.info(
-        #     f"No getSelectValue options for '{script_id}'. Trying SOAP CustomRecord fallback..."
-        # )
         return _get_segment_options_via_custom_record_search(ns_client, script_id)
 
     return {}

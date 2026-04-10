@@ -502,13 +502,14 @@ def _prepare_custom_field_lookups(ns_client, input_data, config):
 
 def _resolve_custom_field_value(script_id, value, config):
     options_by_name = (config.get("_custom_field_lookup") or {}).get(script_id, {})
-    resolved_internal_id = _resolve_select_option_internal_id(script_id, value, options_by_name)
-    if resolved_internal_id is not None:
-        return resolved_internal_id
     # No lookup table for this field: preserve original value.
     if not options_by_name:
         return value
 
+    resolved_internal_id = _resolve_select_option_internal_id(script_id, value, options_by_name)
+    if resolved_internal_id is not None:
+        return resolved_internal_id
+    
     raise ValueError(
         f"Custom field '{script_id}' received value '{value}' that could not be resolved to an internalId."
     )

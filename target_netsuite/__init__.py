@@ -263,7 +263,7 @@ def _resolve_select_option_internal_id(script_id, value, options_by_internalId):
     return None
 
 
-def _get_select_value_page(ns_client, field_description, max_pages=30):
+def _get_select_value_page(ns_client, field_description, max_pages=50):
     all_values = []
     for page_index in range(1, max_pages):
         try:
@@ -457,7 +457,7 @@ def _get_lookup_options_for_custom_field(ns_client, script_id):
     return {}
 
 
-def _prepare_custom_field_lookups(ns_client, input_data, config):
+def prepare_custom_field_lookups(ns_client, input_data, config):
     custom_fields = config.get("custom_fields") or []
     custom_field_lookup = {}
 
@@ -501,7 +501,7 @@ def _prepare_custom_field_lookups(ns_client, input_data, config):
             f"({len(values)} value(s) checked, {len(options_by_internalId)} option(s) cached)."
         )
 
-    config["_custom_field_lookup"] = custom_field_lookup
+    return custom_field_lookup
 
 
 
@@ -1136,7 +1136,7 @@ def upload_journals(config, ns_client):
     
     # Load reference data
     reference_data = get_reference_data(ns_client, input_data)
-    _prepare_custom_field_lookups(ns_client, input_data, config)
+    config["_custom_field_lookup"] = prepare_custom_field_lookups(ns_client, input_data, config)
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

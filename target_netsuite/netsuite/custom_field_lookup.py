@@ -264,7 +264,11 @@ def prepare_custom_field_lookups(ns_client, input_data, config):
         unique_missing = sorted({
             str(value)
             for value in values
-            if _resolve_select_option_internal_id(script_id, value, options_by_internalId) is None
+            if (
+                not _is_internal_id_value(value, options_by_internalId)
+                and _resolve_select_option_internal_id(script_id, value, options_by_internalId) is None
+            )
+            # if _resolve_select_option_internal_id(script_id, value, options_by_internalId) is None
         })
         if unique_missing:
             raise ValueError(

@@ -443,11 +443,12 @@ def _get_segment_options_via_custom_record_search(ns_client, segment_script_id):
 
 
 def _get_lookup_options_for_custom_field(ns_client, script_id):
+    script_id_lower = script_id.lower() if isinstance(script_id, str) else ""
 
-    if script_id.startswith("custbody") or script_id.startswith("custcol"):
+    if script_id_lower.startswith("custbody") or script_id_lower.startswith("custcol"):
         return _get_select_options_by_name(ns_client, script_id)
 
-    elif script_id.lower().startswith("cseg"):
+    elif script_id_lower.lower().startswith("cseg"):
         return _get_segment_options_via_custom_record_search(ns_client, script_id)
 
     return {}

@@ -233,17 +233,20 @@ def _normalize_lookup_value(value):
     return str(value).strip().lower()
 
 
-def _resolve_select_option_internal_id(script_id, value, options_by_name):
-    if not options_by_name:
+def _resolve_select_option_internal_id(script_id, value, options_by_internalId):
+    if not options_by_internalId:
         return None
+
     lookup_key = _normalize_lookup_value(value)
-    if lookup_key in options_by_name:
-        return options_by_name[lookup_key]
+    for internal_id, option_name in options_by_internalId.items():
+        if lookup_key == option_name:
+            #get the first match (name is not unique)
+            return internal_id
 
     # NetSuite can return parent-qualified labels (e.g. "online : instagram").
     leaf_key = lookup_key.split(":")[-1].strip()
     matching_internal_ids = []
-    for option_name, internal_id in options_by_name.items():
+    for internal_id, option_name in options_by_internalId.items():
         option_leaf = option_name.split(":")[-1].strip()
         if option_leaf == leaf_key:
             matching_internal_ids.append(internal_id)
@@ -291,7 +294,7 @@ def _get_select_value_page(ns_client, field_description, max_pages=30):
             break
     return all_values
 
-def _get_select_options_by_name(ns_client, script_id):
+def _get_select_options_by_internalId(ns_client, script_id):
     field_descriptions = [
         {"recordType": "journalEntry", "sublist": "lineList", "field": script_id},
         {"recordType": "journalEntry", "field": script_id},
@@ -300,10 +303,10 @@ def _get_select_options_by_name(ns_client, script_id):
         collected = _get_select_value_page(ns_client, field_description)
 
         if collected:
-            options_by_name = {}
+            options_by_internalId = {}
             for entry in collected:
-                options_by_name[_normalize_lookup_value(entry["name"])] = entry["internalId"]
-            return options_by_name
+                options_by_internalId[str(entry["internalId"])] = _normalize_lookup_value(entry["name"])
+            return options_by_internalId
 
     return {}
 
@@ -410,14 +413,14 @@ def _search_custom_records_for_rec_type_ref(ns_client, rec_type_ref, segment_scr
         return {}
 
     records = _soap_search_all(ns_client, search_record)
-    options_by_name = {}
+    options_by_internalId = {}
     for rec in records:
         name = rec.get("name")
         internal_id = rec.get("internalId")
         if name and internal_id:
-            options_by_name[_normalize_lookup_value(name)] = str(internal_id)
+            options_by_internalId[str(internal_id)] = _normalize_lookup_value(name)
 
-    return options_by_name
+    return options_by_internalId
 
 
 def _get_segment_options_via_custom_record_search(ns_client, segment_script_id):
@@ -426,17 +429,17 @@ def _get_segment_options_via_custom_record_search(ns_client, segment_script_id):
         ns_client, custom_record_type_script_id
     )
     if rec_type_internal_id:
-        options_by_name = _search_custom_records_for_rec_type_ref(
+        options_by_internalId = _search_custom_records_for_rec_type_ref(
             ns_client,
             ns_client.client.RecordRef(internalId=rec_type_internal_id),
             segment_script_id,
         )
-        if options_by_name:
+        if options_by_internalId:
             logger.info(
                 f"Custom Segment '{segment_script_id}' fetched "
-                f"{len(options_by_name)} options via CustomRecord recType internalId={rec_type_internal_id}"
+                f"{len(options_by_internalId)} options via CustomRecord recType internalId={rec_type_internal_id}"
             )
-            return options_by_name
+            return options_by_internalId
 
     logger.debug(f"Custom Segment returned no value for '{segment_script_id}'")
     return {}
@@ -446,7 +449,7 @@ def _get_lookup_options_for_custom_field(ns_client, script_id):
     script_id_lower = script_id.lower() if isinstance(script_id, str) else ""
 
     if script_id_lower.startswith("custbody") or script_id_lower.startswith("custcol"):
-        return _get_select_options_by_name(ns_client, script_id)
+        return _get_select_options_by_internalId(ns_client, script_id)
 
     elif script_id_lower.lower().startswith("cseg"):
         return _get_segment_options_via_custom_record_search(ns_client, script_id)
@@ -471,9 +474,9 @@ def _prepare_custom_field_lookups(ns_client, input_data, config):
         if not values:
             continue
 
-        options_by_name = _get_lookup_options_for_custom_field(ns_client, script_id)
+        options_by_internalId = _get_lookup_options_for_custom_field(ns_client, script_id)
 
-        if not options_by_name:
+        if not options_by_internalId:
             # Not all configured fields are List/Record selects.
             # If options are unavailable, keep legacy passthrough behavior.
             logger.debug(
@@ -484,7 +487,7 @@ def _prepare_custom_field_lookups(ns_client, input_data, config):
         unique_missing = sorted({
             str(value)
             for value in values
-            if _resolve_select_option_internal_id(script_id, value, options_by_name) is None
+            if _resolve_select_option_internal_id(script_id, value, options_by_internalId) is None
         })
         if unique_missing:
             raise ValueError(
@@ -492,22 +495,46 @@ def _prepare_custom_field_lookups(ns_client, input_data, config):
                 f"Provide a valid option label."
             )
 
-        custom_field_lookup[script_id] = options_by_name
+        custom_field_lookup[script_id] = options_by_internalId
         logger.info(
             f"Lookup enabled for custom field '{script_id}' "
-            f"({len(values)} value(s) checked, {len(options_by_name)} option(s) cached)."
+            f"({len(values)} value(s) checked, {len(options_by_internalId)} option(s) cached)."
         )
 
     config["_custom_field_lookup"] = custom_field_lookup
 
 
-def _resolve_custom_field_value(script_id, value, config):
-    options_by_name = (config.get("_custom_field_lookup") or {}).get(script_id, {})
-    # No lookup table for this field: preserve original value.
-    if not options_by_name:
-        return value
 
-    resolved_internal_id = _resolve_select_option_internal_id(script_id, value, options_by_name)
+def _is_internal_id_value(value, options_by_internalId):
+    if value is None or not options_by_internalId:
+        return False
+
+    try:
+        internal_id = _to_internal_id_string(value)
+    except Exception:
+        return False
+
+    return internal_id in options_by_internalId
+
+
+def _to_internal_id_string(value):
+    if isinstance(value, str):
+        value = value.strip()
+    return stringify_number(value)
+
+def _resolve_custom_field_value(script_id, value, config):
+    options_by_internalId = (config.get("_custom_field_lookup") or {}).get(script_id, {})
+    # No lookup table for this field: preserve original value.
+    # Example: Free-Form Text at netsuite
+    if not options_by_internalId:
+        return value
+        
+    resolved_internal_id = None
+    if _is_internal_id_value(value, options_by_internalId):
+        resolved_internal_id =  _to_internal_id_string(value)
+    else:
+        resolved_internal_id = _resolve_select_option_internal_id(script_id, value, options_by_internalId)
+    
     if resolved_internal_id is not None:
         return resolved_internal_id
     
@@ -829,7 +856,7 @@ def build_lines(x, ref_data, config):
             value = row.get(input_id)
             if not ns_id or value is None or pd.isna(value) or value == "":
                 continue
-
+            
             resolved_value = _resolve_custom_field_value(ns_id, value, config)
             field_value = {"type": "Select", "scriptId": ns_id, "value": resolved_value}
             ns_id_lower = ns_id.lower() if isinstance(ns_id, str) else ""

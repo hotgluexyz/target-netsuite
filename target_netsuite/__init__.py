@@ -13,6 +13,7 @@ from heapq import nlargest as _nlargest
 
 from target_netsuite.netsuite import NetSuite
 from target_netsuite.netsuite.utils import clean_logs, stringify_number
+from target_netsuite.netsuite.custom_field_lookup import resolve_custom_field_value, prepare_custom_field_lookups
 
 from netsuitesdk.internal.exceptions import NetSuiteRequestError
 
@@ -227,6 +228,8 @@ def get_tax_code(tax_code, tax_codes):
         "internalId": code_data["internalId"],
         "externalId": code_data["externalId"],
     }
+
+
 
 def build_lines(x, ref_data, config):
 
@@ -541,14 +544,35 @@ def build_lines(x, ref_data, config):
             value = row.get(input_id)
             if not ns_id or value is None or pd.isna(value) or value == "":
                 continue
+            
+            resolved_value = resolve_custom_field_value(ns_id, value, config)
+            field_value = {"type": "Select", "scriptId": ns_id, "value": resolved_value}
+            ns_id_lower = ns_id.lower() if isinstance(ns_id, str) else ""
+            is_custbody_field = ns_id_lower.startswith("custbody")
+            is_custom_segment_field = ns_id_lower.startswith("cseg")
 
-            field_value = {"type": "Select", "scriptId": ns_id, "value": value}
-            if isinstance(ns_id, str) and ns_id.lower().startswith("custbody"):
-                # Header-level fields should be set once per JE.
-                if ns_id not in seen_header_custom_field_ids:
-                    header_custom_field_values.append(field_value)
-                    seen_header_custom_field_ids.add(ns_id)
+            add_to_header = False
+            add_to_line = False
+
+            if is_custbody_field:
+                add_to_header = True
+            elif is_custom_segment_field:
+                level = entry.get("level")
+                level = level.lower() if isinstance(level, str) else "line"
+                if level not in {"line", "body", "both"}:
+                    level = "line"
+
+                add_to_header = level in {"body", "both"}
+                add_to_line = level in {"line", "both"}
             else:
+                add_to_line = True
+
+            if add_to_header and ns_id not in seen_header_custom_field_ids:
+                # Header-level fields should be set once per JE.
+                header_custom_field_values.append(field_value)
+                seen_header_custom_field_ids.add(ns_id)
+
+            if add_to_line:
                 custom_field_values.append(field_value)
 
         if custom_field_values:
@@ -800,6 +824,7 @@ def upload_journals(config, ns_client):
     
     # Load reference data
     reference_data = get_reference_data(ns_client, input_data)
+    config["_custom_field_lookup"] = prepare_custom_field_lookups(ns_client, input_data, config)
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)
 

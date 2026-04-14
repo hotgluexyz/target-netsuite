@@ -3,7 +3,6 @@ import argparse
 import json
 import logging
 import os
-import sys
 import re
 
 import pandas as pd
@@ -803,17 +802,16 @@ def read_input_data(config):
     
     # Verify it has required columns
     if not all(col in cols for col in REQUIRED_COLS):
-        logger.error(
-            f"CSV is mising REQUIRED_COLS. Found={json.dumps(cols)}, Required={json.dumps(REQUIRED_COLS)}"
+        missing_cols = set(REQUIRED_COLS) - set(cols)
+        raise Exception(
+            f"Missing required columns in journal entries: {', '.join(sorted(missing_cols))}"
         )
-        sys.exit(1)
-    
+
     # Verify at least one account identifier column is present
     if not any(col in cols for col in ACCOUNT_COLS):
-        logger.error(
-            f"CSV must contain at least one account identifier column. Found={json.dumps(cols)}, Account options={json.dumps(ACCOUNT_COLS)}"
+        raise Exception(
+            f"CSV must contain at least one account identifier column. Include one of: {', '.join(ACCOUNT_COLS)}"
         )
-        sys.exit(1)
     # replace nan with None
     input_data = input_data.where(pd.notnull(input_data), None)
     return input_data

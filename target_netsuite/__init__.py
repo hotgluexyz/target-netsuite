@@ -805,9 +805,11 @@ def upload_journals(config, ns_client):
 
     # Post the journal entries to Netsuite
     posted_internal_ids = []
+    current_journal = None
     try:
         total_journals = len(journals)
         for index, journal in enumerate(journals, start=1):
+            current_journal = journal
             external_id = journal.get("externalId")
             is_existing = journal_entry_exists(ns_client, external_id) if external_id else False
             line_count = len(journal.get("lineList", []))
@@ -816,15 +818,23 @@ def upload_journals(config, ns_client):
                 f"Posting journal {index}/{total_journals} externalId={external_id} lineCount={line_count}"
             )
             response = post_journal_entries(journal, ns_client, reference_data)
-            logger.info(f"Posted journal {index}/{total_journals} externalId={external_id}")
+            response_data = json.loads(response)
+            internal_id = response_data.get("JournalEntry", {}).get("internalId")
+            logger.info(
+                f"Posted journal {index}/{total_journals} externalId={external_id} internalId={internal_id}"
+            )
 
             if not is_existing:
-                response_data = json.loads(response)
-                internal_id = response_data.get("JournalEntry", {}).get("internalId")
                 if internal_id:
                     posted_internal_ids.append(internal_id)
     except Exception as e:
-        logger.error(f"Posting failed. Rolling back {len(posted_internal_ids)} newly posted journal(s)...")
+        failed_external_id = current_journal.get("externalId") if current_journal else None
+        logger.error(
+            f"Posting failed for externalId={failed_external_id}. Rolling back {len(posted_internal_ids)} newly posted journal(s)..."
+        )
+        if current_journal:
+            failed_journal_log = clean_logs(current_journal)
+            logger.info(f"Failed journal payload: {failed_journal_log}")
         delete_journal_entries(ns_client, posted_internal_ids)
         raise
 

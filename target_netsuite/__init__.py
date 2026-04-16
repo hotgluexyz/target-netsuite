@@ -4,6 +4,9 @@ import json
 import logging
 import os
 import re
+import signal
+import errno
+import sys
 
 import pandas as pd
 import numpy as np
@@ -16,9 +19,27 @@ from target_netsuite.netsuite.custom_field_lookup import resolve_custom_field_va
 
 from netsuitesdk.internal.exceptions import NetSuiteRequestError
 
+
+class SafeStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        try:
+            super().emit(record)
+        except BrokenPipeError:
+            return
+        except OSError as exc:
+            if exc.errno == errno.EPIPE:
+                return
+            raise
+
+
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+
 logger = logging.getLogger("target-netsuite")
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[SafeStreamHandler(sys.stdout)],
 )
 
 
@@ -885,4 +906,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BrokenPipeError:
+        sys.exit(0)
+    except OSError as exc:
+        if exc.errno == errno.EPIPE:
+            sys.exit(0)
+        raise

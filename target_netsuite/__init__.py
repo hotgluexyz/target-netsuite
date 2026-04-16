@@ -806,13 +806,17 @@ def upload_journals(config, ns_client):
     # Post the journal entries to Netsuite
     posted_internal_ids = []
     try:
-        for journal in journals:
+        total_journals = len(journals)
+        for index, journal in enumerate(journals, start=1):
             external_id = journal.get("externalId")
             is_existing = journal_entry_exists(ns_client, external_id) if external_id else False
+            line_count = len(journal.get("lineList", []))
 
-            logger.info(f"Posting journal: {journal}")
+            logger.info(
+                f"Posting journal {index}/{total_journals} externalId={external_id} lineCount={line_count}"
+            )
             response = post_journal_entries(journal, ns_client, reference_data)
-            logger.info(f"Posted journal: {json.dumps(response, default=str)}")
+            logger.info(f"Posted journal {index}/{total_journals} externalId={external_id}")
 
             if not is_existing:
                 response_data = json.loads(response)
@@ -824,8 +828,7 @@ def upload_journals(config, ns_client):
         delete_journal_entries(ns_client, posted_internal_ids)
         raise
 
-    logger.info(f"Posted journal entries: ")
-    logger.info(f"{json.dumps(journals,default=str)}")
+    logger.info(f"Posted {len(journals)} journal entries.")
 
 def upload(config, args):
     # Login to NetSuite

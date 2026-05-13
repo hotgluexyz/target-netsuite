@@ -97,7 +97,7 @@ def get_reference_data(ns_client, input_data):
     try:
         if "Location" in input_data.columns:
             if not input_data["Location"].dropna().empty:
-                reference_data["Locations"] = ns_client.entities["Locations"](ns_client.client).get_all(["name"])
+                reference_data["Locations"] = ns_client.entities["Locations"](ns_client.client).get_all(["name", "parent"])
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
@@ -436,14 +436,30 @@ def build_lines(x, ref_data, config):
 
         # Get the NetSuite Location Ref
         if ref_data.get("Locations") and row.get("Location") and not pd.isna(row.get("Location")):
-            loc_data = [l for l in ref_data["Locations"] if l["name"] == row["Location"]]
-            if loc_data:
-                loc_data = loc_data[0]
-                journal_entry_line["location"] = {
-                    "name": loc_data.get("name"),
-                    "externalId": loc_data.get("externalId"),
-                    "internalId": loc_data.get("internalId"),
-                }
+            location_parent_names = [
+                l["parent"]["name"] + " : " + l["name"]
+                for l in ref_data["Locations"]
+                if l.get("parent") is not None
+            ]
+            location_noparent_names = [l["name"] for l in ref_data["Locations"] if l.get("parent") is None]
+            loc_names = location_parent_names + location_noparent_names
+            loc_name = get_close_matches(row["Location"], loc_names)
+            if not loc_name:
+                # Secondary check against leaf names to support non-qualified values.
+                loc_names = [l["name"] for l in ref_data["Locations"]]
+                loc_name = get_close_matches(row["Location"], loc_names)
+            if loc_name:
+                loc_name = max(loc_name, key=loc_name.get)
+                loc_data = [l for l in ref_data["Locations"] if (l.get("parent") and (l["parent"]["name"] + " : " + l["name"]) == loc_name) or (l["name"] == loc_name)]
+                if loc_data:
+                    loc_data = loc_data[0]
+                    journal_entry_line["location"] = {
+                        "name": loc_data.get("name"),
+                        "externalId": loc_data.get("externalId"),
+                        "internalId": loc_data.get("internalId"),
+                    }
+            else:
+                logger.warning(f"Location {row['Location']} not found. Omitting location from journal entry line")
 
         # Get the NetSuite Location Ref
         customer_name = row.get("Customer Name")

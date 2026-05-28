@@ -820,8 +820,9 @@ def upload_journals(config, ns_client):
                 if internal_id:
                     posted_internal_ids.append(internal_id)
     except Exception as e:
-        logger.error(f"Posting failed. Rolling back {len(posted_internal_ids)} newly posted journal(s)...")
+        logger.info(f"Posting failed. Rolling back {len(posted_internal_ids)} newly posted journal(s)...")
         delete_journal_entries(ns_client, posted_internal_ids)
+        logger.error(f"{type(e).__module__}.{type(e).__name__}: {e}")
         raise
 
     logger.info(f"Posted journal entries: ")

@@ -137,8 +137,15 @@ def get_reference_data(ns_client, input_data):
     if (
         ("Account Number" in input_data.columns and not input_data["Account Number"].dropna().empty) or
         ("Account Name" in input_data.columns and not input_data["Account Name"].dropna().empty)
-    ):
-        reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
+    ):  
+        try:
+            reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
+        except Exception as e:
+            if "You need  the 'Lists -> Documents and Files' permission" in str(e):
+                logger.info(f"Permissions for Documents and Files missing. Attempting to get Accounts with body_fields_only=True")
+                reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client, body_fields_only=True).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
+            else:
+                raise e
 
     if "Tax Code" in input_data.columns:
         reference_data["Tax Codes"] = ns_client.entities["TaxCodes"](ns_client.client).get_all(["name", "taxType", "itemId"])

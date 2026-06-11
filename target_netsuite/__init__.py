@@ -144,7 +144,6 @@ def get_reference_data(ns_client, input_data):
             if "You need  the 'Lists -> Documents and Files' permission" in str(e):
                 logger.info(f"Permissions for Documents and Files missing. Attempting to get Accounts with body_fields_only=True")
                 reference_data["Accounts"] = ns_client.entities["Accounts"](ns_client.client, body_fields_only=True).get_all(["acctName", "acctNumber", "subsidiaryList", "parent"])
-                ns_client.client.bodyFieldsOnly = False
             else:
                 raise e
 

@@ -3,7 +3,9 @@
 **target-netsuite** is a target that inserts JournalEntries from a CSV file into the Netsuite API.
 **target-netsuite** can be run on [hotglue](https://hotglue.com), an embedded integration platform for ETL jobs.
 
+## Requirements
 
+Tested on Python 3.7, 3.10, and 3.14. Python 3.7 is end-of-life; upstream dependencies may drop support for it in future releases.
 
 ```bash
 $ python3 -m venv env/target-netsuite

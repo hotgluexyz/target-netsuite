@@ -750,17 +750,20 @@ def load_journal_entries(input_data, reference_data, config):
     # Build the entries
     try:
         if "Journal Entry Id" in input_data.columns and "Subsidiary" in input_data.columns:
-            lines = input_data.groupby(["Journal Entry Id", "Subsidiary"], dropna=False).apply(build_lines, reference_data, config)
+            grouped = input_data.groupby(["Journal Entry Id", "Subsidiary"], dropna=False)
         else:
             # Assuming Journal Entry Id will always be present
-            lines = input_data.groupby(["Journal Entry Id"]).apply(build_lines, reference_data, config)
+            grouped = input_data.groupby(["Journal Entry Id"])
+        # Iterate groups instead of apply(): pandas 2.2+/3 change which columns
+        # are passed into apply and break Journal Entry Id / Subsidiary access.
+        lines = [build_lines(group, reference_data, config) for _, group in grouped]
     except RuntimeError as e:
         raise Exception("Building Netsuite JournalEntries failed!")
 
     # Print journal entries
     logger.info(f"Loaded {len(lines)} journal entries to post")
 
-    return lines.values
+    return lines
 
 
 def journal_entry_exists(ns_client, external_id):

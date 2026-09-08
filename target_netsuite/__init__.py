@@ -535,7 +535,7 @@ def build_lines(x, ref_data, config):
                         customer_names.append(c["companyName"])
                 # only get close matches if the exact same name is not present in customers
                 if customer_name is None or pd.isna(customer_name) or customer_name == "":
-                    customer_name = {}
+                    raise Exception(f"Customer {customer_id} was not found")
                 elif customer_name in customer_names:
                     customer_name = {customer_name: 1}
                 else:

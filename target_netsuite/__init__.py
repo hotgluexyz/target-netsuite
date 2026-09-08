@@ -538,7 +538,7 @@ def build_lines(x, ref_data, config):
                 customer_log = clean_logs(customer)
                 logger.info(f"Customers found for id '{customer_id}': {customer_log}")
                 if journal_subsidiary:
-                    customer = [c for c in customer if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
+                    customer = [c for c in customer if journal_subsidiary["internalId"] in c["subsidiaryIds"]]
 
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name

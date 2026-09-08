@@ -65,6 +65,23 @@ class Subsidiaries(BaseFilter):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Subsidiary')
 
 
+class CustomerSubsidiaryRelationships(BaseFilter):
+    """Customer↔subsidiary links. Not in netsuitesdk SEARCH_RECORD_TYPES — custom search."""
+
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='customerSubsidiaryRelationship')
+
+    def get_all_generator(self, page_size=1000):
+        # PaginatedSearch skips search_factory when search_record is passed
+        ps = PaginatedSearch(
+            client=self.ns_client,
+            type_name='CustomerSubsidiaryRelationship',
+            pageSize=page_size,
+            search_record=self.ns_client._client.get_type('ns13:CustomerSubsidiaryRelationshipSearch')(),
+        )
+        return self._paginated_search_generator(ps)
+
+
 class Departments(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Department')

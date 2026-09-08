@@ -94,6 +94,15 @@ def get_reference_data(ns_client, input_data, config=None):
     logger.info(f"Reading reference data from API...")
     reference_data = {}
 
+    if "Subsidiary" in input_data.columns and not input_data["Subsidiary"].dropna().empty:
+        reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
+        #special case to handle when Subsidiary on JE is not the primary subsidiary for the customer
+        try:
+            reference_data["CustomerSubsidiaryRelationship"] = ns_client.entities["CustomerSubsidiaryRelationship"](ns_client.client).get_all(["entity", "subsidiary"])
+        except NetSuiteRequestError as e:
+            message = e.message.replace("error", "failure").replace("Error", "")
+            logger.warning(f"It was not possible to retrieve CustomerSubsidiaryRelationship data: {message}")
+
     try:
         if "Location" in input_data.columns:
             if not input_data["Location"].dropna().empty:
@@ -132,15 +141,30 @@ def get_reference_data(ns_client, input_data, config=None):
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
     
+    if "Customer" in reference_data and reference_data["Customer"]:
+        customer_subsidiary_ids = {}
+        if  "CustomerSubsidiaryRelationship" in reference_data and reference_data["CustomerSubsidiaryRelationship"]:
+            #map the subsidiaries for each customer
+            for relationship in reference_data["CustomerSubsidiaryRelationship"]:
+                entity = relationship.get("entity")
+                subsidiary = relationship.get("subsidiary")
+                customer_id, subsidiary_id = entity["internalId"], subsidiary["internalId"]
+                if customer_id and subsidiary_id:
+                    customer_subsidiary_ids.setdefault(customer_id, set()).add(subsidiary_id)
+        for customer in reference_data["Customer"]:
+            customer_id = customer.get("internalId")
+            subsidiaryIds = set(customer_subsidiary_ids.get(customer_id, set()))
+            # primary is always valid even if CSR fetch failed / empty
+            primary = (customer.get("subsidiary") or {})
+            if "internalId" in primary and primary["internalId"]:
+                subsidiaryIds.add(primary["internalId"])
+            customer["subsidiaryIds"] = subsidiaryIds
+    
     if not input_data["Class"].dropna().empty:
         reference_data["Classifications"] = ns_client.entities["Classifications"](ns_client.client).get_all(["name", "parent"])
     
     if not input_data["Currency"].dropna().empty:
         reference_data["Currencies"] = ns_client.entities["Currencies"](ns_client.client).get_all()
-
-    if "Subsidiary" in input_data.columns:
-        if not input_data["Subsidiary"].dropna().empty:
-            reference_data["Subsidiaries"] = ns_client.entities["Subsidiaries"](ns_client.client).get_all(["name", "parent"])
     
     if "Department" in input_data.columns:
         if not input_data["Department"].dropna().empty:
@@ -562,7 +586,7 @@ def build_lines(x, ref_data, config):
                     customer_data_log = clean_logs(customer_data)
                     logger.info(f"Customers found for customer name '{customer_name}': {customer_data_log}")
                     if journal_subsidiary:
-                        customer_data = [c for c in customer_data if c["subsidiary"]["internalId"] == journal_subsidiary["internalId"]]
+                        customer_data = [c for c in customer_data if journal_subsidiary["internalId"] in c["subsidiaryIds"]]
                     if customer_data:
                         customer_data = customer_data[0]
                         journal_entry_line["entity"] = {

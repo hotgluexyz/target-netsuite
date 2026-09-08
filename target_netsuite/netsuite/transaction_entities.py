@@ -65,6 +65,42 @@ class Subsidiaries(BaseFilter):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Subsidiary')
 
 
+class CustomerSubsidiaryRelationships(BaseFilter):
+    """Customer↔subsidiary links. Not in netsuitesdk SEARCH_RECORD_TYPES — custom search."""
+
+    def __init__(self, ns_client):
+        ApiBase.__init__(self, ns_client=ns_client, type_name='customerSubsidiaryRelationship')
+
+    # def _wsdl_type(self, type_name):
+    #     zeep = self.ns_client._client
+    #     for prefix in zeep.wsdl.types.prefix_map:
+    #         try:
+    #             toReturn = zeep.get_type(f'{prefix}:{type_name}')
+    #             return zeep.get_type(f'{prefix}:{type_name}')
+    #         except Exception:
+    #             continue
+    #     raise LookupError(f'WSDL type not found: {type_name}')
+
+    def get_all_generator(self, page_size=1000):
+        # PaginatedSearch skips search_factory when search_record is passed
+        ps = PaginatedSearch(
+            client=self.ns_client,
+            type_name='CustomerSubsidiaryRelationship',
+            pageSize=page_size,
+            search_record=self.ns_client._client.get_type('ns13:CustomerSubsidiaryRelationshipSearch')(),
+        )
+        return self._paginated_search_generator(ps)
+
+    # def get_all(self, selected_fileds=[]):
+    #     output = super().get_all(selected_fileds)
+    #     # for rec in output:
+    #     #     for key in ('entity', 'subsidiary'):
+    #     #         v = rec.get(key)
+    #     #         if v is not None and hasattr(v, '__dict__') and '__values__' in v.__dict__:
+    #     #             rec[key] = dict(v.__dict__['__values__'])
+    #     return output
+
+
 class Departments(BaseFilter):
     def __init__(self, ns_client):
         ApiBase.__init__(self, ns_client=ns_client, type_name='Department')

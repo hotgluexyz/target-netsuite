@@ -90,7 +90,7 @@ def get_ns_client(config):
     logger.info(f"Successfully created netsuite connection..")
     return ns
 
-def get_reference_data(ns_client, input_data):
+def get_reference_data(ns_client, input_data, config=None):
     logger.info(f"Reading reference data from API...")
     reference_data = {}
 
@@ -104,14 +104,30 @@ def get_reference_data(ns_client, input_data):
     
     try:
         if not input_data["Customer Name"].dropna().empty:
-            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all([
-                "altName",
-                "name",
-                "entityId",
-                "companyName",
-                "subsidiary",
-                "isInactive"
-            ])
+            customer_fields = ["altName", "name", "entityId", "companyName", "subsidiary", "isInactive"]
+            lookup_field = (config or {}).get("customer_id_lookup_field")
+            if lookup_field:
+                customer_fields.append("customFieldList")
+            reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(customer_fields)
+            # Flatten configured custom field onto each customer for id lookup
+            # if lookup_field:
+            #     for c in reference_data["Customer"]:
+            #         cfl = c.pop("customFieldList", None)
+            #         fields = (cfl.__dict__.get("__values__") if cfl is not None and hasattr(cfl, "__dict__") else None) or {}
+            #         for f in fields.get("customField") or []:
+            #             fv = f.__dict__.get("__values__", {}) if hasattr(f, "__dict__") else f
+            #             if isinstance(fv, dict) and str(fv.get("scriptId") or "").lower() == lookup_field.lower():
+            #                 c[lookup_field] = fv.get("value")
+            #                 break
+            if lookup_field:
+                for c in reference_data["Customer"]:
+                    cfl = c.pop("customFieldList", None)
+                    if not cfl:
+                        continue
+                    for f in cfl["customField"] or []:
+                        if str(f["scriptId"] or "").lower() == lookup_field.lower():
+                            c[lookup_field] = f["value"]
+                            break
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -476,9 +492,22 @@ def build_lines(x, ref_data, config):
             if customer_id: 
                 # Search for the customer based on the customer id
                 # and removes inactive customers so the line is skipped
+                stringfied_customer_id = stringify_number(customer_id)
+                lookup_field = config.get("customer_id_lookup_field")
                 customer = list(
                     filter(
-                        lambda x: (x['internalId'] == stringify_number(customer_id) or x['entityId'] == stringify_number(customer_id)) and (x["isInactive"] == False),
+                        lambda x: (
+                            x["isInactive"] == False
+                            and (
+                                x["internalId"] == stringfied_customer_id
+                                or x["entityId"] == stringfied_customer_id
+                                or (
+                                    lookup_field
+                                    and x.get(lookup_field) is not None
+                                    and stringify_number(x.get(lookup_field)) == stringfied_customer_id
+                                )
+                            )
+                        ),
                         ref_data['Customer']
                     )
                 )
@@ -847,7 +876,7 @@ def upload_journals(config, ns_client):
     input_data = read_input_data(config)
     
     # Load reference data
-    reference_data = get_reference_data(ns_client, input_data)
+    reference_data = get_reference_data(ns_client, input_data, config)
     config["_custom_field_lookup"] = prepare_custom_field_lookups(ns_client, input_data, config)
     # Load Journal Entries CSV to post + Convert to NetSuite format
     journals = load_journal_entries(input_data, reference_data, config)

@@ -110,15 +110,6 @@ def get_reference_data(ns_client, input_data, config=None):
                 customer_fields.append("customFieldList")
             reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(customer_fields)
             # Flatten configured custom field onto each customer for id lookup
-            # if lookup_field:
-            #     for c in reference_data["Customer"]:
-            #         cfl = c.pop("customFieldList", None)
-            #         fields = (cfl.__dict__.get("__values__") if cfl is not None and hasattr(cfl, "__dict__") else None) or {}
-            #         for f in fields.get("customField") or []:
-            #             fv = f.__dict__.get("__values__", {}) if hasattr(f, "__dict__") else f
-            #             if isinstance(fv, dict) and str(fv.get("scriptId") or "").lower() == lookup_field.lower():
-            #                 c[lookup_field] = fv.get("value")
-            #                 break
             if lookup_field:
                 for c in reference_data["Customer"]:
                     cfl = c.pop("customFieldList", None)

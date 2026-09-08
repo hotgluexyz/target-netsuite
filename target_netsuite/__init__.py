@@ -103,9 +103,18 @@ def get_reference_data(ns_client, input_data, config=None):
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
-        if not input_data["Customer Name"].dropna().empty:
+        lookup_field = (config or {}).get("customer_id_lookup_field")
+        if (
+            not input_data["Customer Name"].dropna().empty
+            or (
+                lookup_field
+                and (
+                    ("Customer Id" in input_data.columns and not input_data["Customer Id"].dropna().empty)
+                    or ("Customer ID" in input_data.columns and not input_data["Customer ID"].dropna().empty)
+                )
+            )
+        ):
             customer_fields = ["altName", "name", "entityId", "companyName", "subsidiary", "isInactive"]
-            lookup_field = (config or {}).get("customer_id_lookup_field")
             if lookup_field:
                 customer_fields.append("customFieldList")
             reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(customer_fields)

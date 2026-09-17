@@ -284,7 +284,8 @@ def build_lines(x, ref_data, config):
     seen_header_custom_field_ids = set()
     subsidiaries = {}
     nexus = None
-    journal_subsidiary = x["Subsidiary"].iloc[0] if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else None
+    subsidiary_values = x["Subsidiary"].dropna() if ref_data.get("Subsidiaries") and "Subsidiary" in x and not x.empty else pd.Series(dtype=object)
+    journal_subsidiary = subsidiary_values.iloc[0] if not subsidiary_values.empty else None
     if journal_subsidiary:
         if isinstance(journal_subsidiary, str) and journal_subsidiary.isdigit():
             journal_subsidiary = {"internalId": journal_subsidiary}

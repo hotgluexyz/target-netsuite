@@ -112,9 +112,7 @@ def get_reference_data(ns_client, input_data, config=None):
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
-        lookup_fields = config.get("customer_id_lookup_field") or config.get("customer_id_lookup_fields")
-        if isinstance(lookup_fields, str):
-            lookup_fields = [lookup_fields]
+        lookup_fields = config.get("customer_id_lookup_fields")
         if (
             not input_data["Customer Name"].dropna().empty
             or (
@@ -521,9 +519,7 @@ def build_lines(x, ref_data, config):
                 # Search for the customer based on the customer id
                 # and removes inactive customers so the line is skipped
                 stringfied_customer_id = stringify_number(customer_id)
-                lookup_fields = config.get("customer_id_lookup_field") or config.get("customer_id_lookup_fields")
-                if isinstance(lookup_fields, str):
-                    lookup_fields = [lookup_fields]
+                lookup_fields = config.get("customer_id_lookup_fields")
                 customer = list(
                     filter(
                         lambda x: (
@@ -552,7 +548,17 @@ def build_lines(x, ref_data, config):
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name
                     customer = list(filter(lambda x: x.get('companyName') == customer_name, customer))
-            
+                
+                if len(customer) > 1:
+                    matched = ", ".join(
+                        f"{c.get('companyName') or c.get('entityId')} (internalId={c.get('internalId')})"
+                        for c in customer
+                    )
+                    raise Exception(
+                        f"Customer Id '{customer_id}' matched multiple customers: {matched}. "
+                        "Provide a unique Customer Name, or ensure the id maps to one customer across lookup fields."
+                    )
+
             if not customer_id or not customer:
                 customer_names = []
                 for c in ref_data["Customer"]:

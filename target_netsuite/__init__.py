@@ -112,11 +112,11 @@ def get_reference_data(ns_client, input_data, config=None):
         logger.warning(f"It was not possible to retrieve Locations data: {message}")
     
     try:
-        lookup_field = (config or {}).get("customer_id_lookup_field")
+        lookup_fields = config.get("customer_id_lookup_fields")
         if (
             not input_data["Customer Name"].dropna().empty
             or (
-                lookup_field
+                lookup_fields
                 and (
                     ("Customer Id" in input_data.columns and not input_data["Customer Id"].dropna().empty)
                     or ("Customer ID" in input_data.columns and not input_data["Customer ID"].dropna().empty)
@@ -124,19 +124,20 @@ def get_reference_data(ns_client, input_data, config=None):
             )
         ):
             customer_fields = ["altName", "name", "entityId", "companyName", "subsidiary", "isInactive"]
-            if lookup_field:
+            if lookup_fields:
                 customer_fields.append("customFieldList")
             reference_data["Customer"] = ns_client.entities["Customer"](ns_client.client).get_all(customer_fields)
-            # Flatten configured custom field onto each customer for id lookup
-            if lookup_field:
+            # Flatten configured custom fields onto each customer for id lookup
+            if lookup_fields:
+                lookup_by_lower = {f.lower(): f for f in lookup_fields}
                 for c in reference_data["Customer"]:
                     cfl = c.pop("customFieldList", None)
                     if not cfl:
                         continue
                     for f in cfl["customField"] or []:
-                        if str(f["scriptId"] or "").lower() == lookup_field.lower():
-                            c[lookup_field] = f["value"]
-                            break
+                        key = lookup_by_lower.get(str(f["scriptId"] or "").lower())
+                        if key:
+                            c[key] = f["value"]
     except NetSuiteRequestError as e:
         message = e.message.replace("error", "failure").replace("Error", "")
         logger.warning(f"It was not possible to retrieve Customer data: {message}")
@@ -518,7 +519,7 @@ def build_lines(x, ref_data, config):
                 # Search for the customer based on the customer id
                 # and removes inactive customers so the line is skipped
                 stringfied_customer_id = stringify_number(customer_id)
-                lookup_field = config.get("customer_id_lookup_field")
+                lookup_fields = config.get("customer_id_lookup_fields")
                 customer = list(
                     filter(
                         lambda x: (
@@ -527,9 +528,12 @@ def build_lines(x, ref_data, config):
                                 x["internalId"] == stringfied_customer_id
                                 or x["entityId"] == stringfied_customer_id
                                 or (
-                                    lookup_field
-                                    and x.get(lookup_field) is not None
-                                    and stringify_number(x.get(lookup_field)) == stringfied_customer_id
+                                    lookup_fields
+                                    and any(
+                                        x.get(lookup_field) is not None
+                                        and stringify_number(x.get(lookup_field)) == stringfied_customer_id
+                                        for lookup_field in lookup_fields
+                                    )
                                 )
                             )
                         ),
@@ -544,7 +548,17 @@ def build_lines(x, ref_data, config):
                 if len(customer) > 1 and customer_name:
                     # If customer id is duplicated, search for the customer based on the customer name
                     customer = list(filter(lambda x: x.get('companyName') == customer_name, customer))
-            
+                
+                if len(customer) > 1:
+                    matched = ", ".join(
+                        f"{c.get('companyName') or c.get('entityId')} (internalId={c.get('internalId')})"
+                        for c in customer
+                    )
+                    raise Exception(
+                        f"Customer Id '{customer_id}' matched multiple customers: {matched}. "
+                        "Provide a unique Customer Name, or ensure the id maps to one customer across lookup fields."
+                    )
+
             if not customer_id or not customer:
                 customer_names = []
                 for c in ref_data["Customer"]:
